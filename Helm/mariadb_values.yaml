@@ -1,0 +1,56 @@
+---
+rootUser:
+  password: wEAzF#5VLE
+
+db:
+  user: 'dbuser'
+  password: 'NY#xU8qfXM'
+  name: 'db1'
+
+
+initdbScripts:
+  datadbschema.sql: |
+    USE db1;
+
+    DROP TABLE IF EXISTS  queries;
+
+    CREATE TABLE queries (
+        id MEDIUMINT NOT NULL AUTO_INCREMENT,
+        created_at int(10) NOT NULL,
+        client_ip char(15),
+        domain char(255),
+        addresses char(255),
+        PRIMARY KEY (id));
+
+master:
+  persistence:
+    enabled: false
+  resources:
+    limits:
+      cpu: 50m
+      memory: 256Mi
+    requests:
+      cpu: 25m
+      memory: 128Mi
+  livenessProbe:
+    enabled: true
+  readinessProbe:
+    enabled: true
+
+slave:
+  persistence:
+    enabled: false
+  livenessProbe:
+    enabled: false
+  readinessProbe:
+    enabled: false
+  resources:
+    limits:
+      cpu: 50m
+      memory: 256Mi
+    requests:
+      cpu: 25m
+      memory: 128Mi
+
+metrics:
+  enabled: true

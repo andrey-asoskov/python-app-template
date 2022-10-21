@@ -1,0 +1,368 @@
+---
+name: Full Pipeline
+on:
+  pull_request:
+    branches:
+      - "**"
+    types:
+      - opened
+      - edited
+      - reopened
+    paths:
+      - .github/workflows/Full-pipeline.yml
+      - app/**
+      - data/**
+      - tests/**
+      - Helm/**
+      - K8s-manifests/**
+      - .flake8
+      - .pylintrc
+      - .dockerignore
+      - Dockerfile
+      - .hadolint.yaml
+      - docker-compose.yaml
+
+  push:
+    branches:
+      - "**"
+    paths:
+      - .github/workflows/Full-pipeline.yml
+      - app/**
+      - data/**
+      - tests/**
+      - Helm/**
+      - K8s-manifests/**
+      - .flake8
+      - .pylintrc
+      - .dockerignore
+      - Dockerfile
+      - .hadolint.yaml
+      - docker-compose.yaml
+
+jobs:
+  python-lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.9.14 # Version range or exact version of a Python version to use, using SemVer's version range syntax
+          architecture: x64 # optional x64 or x86. Defaults to x64 if not specified
+          # cache: 'pip' # caching pip dependencies
+
+      - name: Python Setup
+        id: python-setup
+        run: |
+          if [ -f ./tests/requirements.txt ];
+          then
+            python -m pip install -r ./tests/requirements.txt
+          fi
+
+          if [ -f ./app/requirements.txt ];
+          then
+            python -m pip install -r ./app/requirements.txt
+          fi
+
+      - name: Python flake8 check
+        id: python-flake8
+        run: |
+          flake8 ./tests/*.py
+          flake8 ./app/*.py
+
+      - name: Python Lint
+        id: python-lint
+        run: |
+          pylint --rcfile ./.pylintrc ./app/*.py
+          pylint --rcfile ./.pylintrc ./tests/*.py
+
+  python-test:
+    runs-on: ubuntu-22.04
+    needs: python-lint
+    services:
+      mariadb:
+        image: mariadb:10.9.3
+        env:
+          MYSQL_ROOT_PASSWORD: wEAzF#5VLE
+          MYSQL_DATABASE: db1
+          MYSQL_USER: dbuser
+          MYSQL_PASSWORD: NY#xU8qfXM
+        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+        ports:
+          - 3306:3306
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.9.14 # Version range or exact version of a Python version to use, using SemVer's version range syntax
+          architecture: x64 # optional x64 or x86. Defaults to x64 if not specified
+          # cache: 'pip' # caching pip dependencies
+      - name: Python Setup
+        id: python-setup
+        run: |
+          if [ -f ./app/requirements.txt ];
+          then
+            python -m pip install -r ./app/requirements.txt
+          fi
+      - name: Test DB connection
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: db1
+          DB_USER: dbuser
+          DB_PASSWORD: NY#xU8qfXM
+        run: |
+          mysql -h ${DB_HOST} -P ${DB_PORT} --database=${DB_NAME} --user=${DB_USER} --password=${DB_PASSWORD} < ./data/datadbschema.sql
+          mysql -h ${DB_HOST} -P ${DB_PORT} --database=${DB_NAME} --user=${DB_USER} --password=${DB_PASSWORD} -e "DESCRIBE queries;"
+
+      - name: Python test noDB
+        id: python-test-nodb
+        run: |
+          python -m unittest tests.test_noDB
+      - name: Python test DB
+        id: python-test-db
+        env:
+          DB_HOST: localhost
+          DB_PORT: 3306
+          DB_NAME: db1
+          DB_USER: dbuser
+          DB_PASSWORD: NY#xU8qfXM
+        run: |
+          python -m unittest tests.test
+
+  docker-build:
+    runs-on: ubuntu-22.04
+    needs: python-test
+    steps:
+      - uses: actions/checkout@v3
+      - name: Get short-sha
+        id: short-sha
+        run: |
+          SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_ENV
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Run hadolint
+        uses: hadolint/hadolint-action@v2.0.0
+        with:
+          dockerfile: ./Dockerfile
+          config: ./.hadolint.yaml
+      - name: Build via docker-compose
+        run: |
+          docker-compose -f ./docker-compose.yaml config
+          docker-compose -f ./docker-compose.yaml up -d --wait --build
+          docker-compose ps
+          docker-compose down
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push to local
+        uses: docker/build-push-action@v3
+        with:
+          push: false
+          load: true
+          tags: "andreyasoskovwork/app:${{ env.short_sha }}"
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "andreyasoskovwork/app:${{ env.short_sha }}"
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+      - name: Build and push to remote
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          load: false
+          tags: "andreyasoskovwork/app:${{ env.short_sha }}"
+      - name: Save docker image to tarball
+        run: |
+          docker save andreyasoskovwork/app:"${{ env.short_sha }}" -o andreyasoskovwork-app_"${{ env.short_sha }}".tar
+      - uses: actions/upload-artifact@v3
+        with:
+          name: "andreyasoskovwork-app_${{ env.short_sha }}.tar"
+          path: "andreyasoskovwork-app_${{ env.short_sha }}.tar"
+          retention-days: 5
+
+  docker-compose-test:
+    runs-on: ubuntu-22.04
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v3
+      - name: Docker-compose check
+        run: |
+          docker-compose -f ./docker-compose.yaml config
+      - name: Run Docker-compose
+        run: |
+          set -x
+          export PATH=$PATH:/usr/libexec/docker/cli-plugins/
+          sed -e "s/build: \./image: andreyasoskovwork\/app:${{ env.short_sha }}/g" ./docker-compose.yaml
+          docker-compose -f ./docker-compose.yaml up -d --build
+          sleep 20
+          docker-compose ps
+          docker-compose ps | grep app | grep -i -E 'running|up'
+          if [ "$?" = "0" ]; then
+            echo "docker-compose OK"
+            exit 0
+          else
+            echo "docker-compose failed"
+            exit 1
+          fi
+          docker-compose down
+
+  k8s-test:
+    runs-on: ubuntu-22.04
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v3
+      - uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.25.2" # default is latest stable
+      - name: Get short-sha
+        id: short-sha
+        run: |
+          SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_ENV
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.4.0
+      - name: k8s-validate
+        id: k8s-validate
+        run: |
+          kubectl version --client
+          for h in $(find ./K8s-manifests -type f  | sort -n);do
+            kubectl apply --validate --dry-run=client -f $h
+          done
+
+      - name: k8s-deploy
+        uses: Azure/k8s-deploy@v3.1
+        with:
+          namespace: "default"
+          action: deploy
+          strategy: basic
+          manifests: |
+            K8s-manifests
+          images: "andreyasoskovwork/app:${{ env.short_sha }}"
+
+      - name: k8s-test
+        id: k8s-test
+        run: |
+
+          for el in $(seq 1 10);do
+            export result=`kubectl get job test -o json | jq .status.succeeded`
+
+            if [ "$result" == "1" ];then
+              echo 'Test is successful!';
+              exit
+            fi
+            sleep 5;
+          done
+
+  helm-test:
+    runs-on: ubuntu-22.04
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v3
+      - name: Get short-sha
+        id: short-sha
+        run: |
+          SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_ENV
+      - uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.25.2" # default is latest stable
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.4.0
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.10.0
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.3.1
+      - name: helm-validate
+        run: |
+
+          ct lint --charts ./Helm/charts/app --validate-maintainers=false
+          helm lint ./Helm/charts/app
+          helm template app \
+          ./Helm/charts/app --values ./Helm/app_values.yaml \
+          --validate
+
+          helm install app \
+          ./Helm/charts/app --values ./Helm/app_values.yaml \
+          --dry-run
+
+      - name: helm-deploy-db
+        run: |
+
+          helm repo add stable https://charts.helm.sh/stable
+
+          helm template db \
+          stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+          --validate
+
+          helm install db \
+          stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+          --dry-run
+
+          helm install db \
+          stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+          --wait
+
+      - name: helm-deploy-app
+        run: |
+
+          helm install app \
+          ./Helm/charts/app --values ./Helm/app_values.yaml \
+          --set image.tag="${{ env.short_sha }}" \
+          --wait
+
+      # - name: k8s-test
+      #   id: k8s-test
+      #   run: |
+      #     set -x
+
+      #     sleep 10
+
+      #     helm list
+      #     kubectl get pod
+      #     helm test app || true
+      #     kubectl describe pod app-test-app
+      #     kubectl logs app-test-app
+      #     kubectl get pod
+
+      #     kubectl get pod | grep test | grep Completed
+      #     if [ "$?" = "0" ]; then
+      #       echo "Test OK"
+      #       exit 0
+      #     else
+      #       echo "Test failed"
+      #       exit 1
+      #     fi
+
+  helm-package:
+    runs-on: ubuntu-22.04
+    needs: helm-test
+    steps:
+      - uses: actions/checkout@v3
+      - name: Get short-sha
+        id: short-sha
+        run: |
+          SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_ENV
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.10.0
+      - name: Helm Package
+        run: helm package ./Helm/charts/app/ -d ./docs/Package
+      - uses: actions/upload-artifact@main
+        with:
+          name: "helm-chart-${{ env.short_sha }}.tgz"
+          path: docs/Package
+          retention-days: 5

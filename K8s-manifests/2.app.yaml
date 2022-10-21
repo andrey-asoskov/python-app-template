@@ -1,0 +1,139 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-params
+  labels:
+    app: app
+data:
+  DB_HOST: db
+  DB_PORT: '3306'
+  DB_NAME: db1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-creds
+  labels:
+    app: app
+stringData:
+  DB_USER: dbuser
+  DB_PASSWORD: NY#xU8qfXM
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: app
+          image: andreyasoskovwork/app:0.1.11
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          ports:
+            - name: app
+              containerPort: 3000
+              protocol: TCP
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            failureThreshold: 1
+            periodSeconds: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            failureThreshold: 1
+            periodSeconds: 3
+            timeoutSeconds: 3
+          envFrom:
+            - configMapRef:
+                name: app-params
+            - secretRef:
+                name: app-creds
+          lifecycle:
+            preStop:
+              httpGet:
+                path: crash
+                port: 3000
+                scheme: HTTP
+          volumeMounts:
+            - name: app-tmp
+              mountPath: /tmp
+      volumes:
+        - name: app-tmp
+          emptyDir: {}
+      terminationGracePeriodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  ports:
+    - name: app
+      port: 3000
+      protocol: TCP
+      targetPort: 3000
+  selector:
+    app: app
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  generation: 1
+  labels:
+    app: app
+  name: app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: app
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: app
+spec:
+  maxReplicas: 5
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: app
+  targetCPUUtilizationPercentage: 70

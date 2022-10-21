@@ -1,0 +1,24 @@
+[MAIN]
+suggestion-mode=yes
+load-plugins=
+
+[MESSAGES CONTROL]
+disable=
+		bad-indentation,
+		#trailing-whitespace,
+		line-too-long,
+		#consider-using-sys-exit,
+		bare-except,
+		#pointless-string-statement,
+		invalid-name,
+		too-many-locals,
+		missing-function-docstring,
+		missing-class-docstring,
+		missing-module-docstring,
+		redefined-builtin,
+		simplifiable-if-statement,
+		import-error,
+		no-member,
+		inconsistent-return-statements,
+		#too-many-statements
+		wrong-import-position,

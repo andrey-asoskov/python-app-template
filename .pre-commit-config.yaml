@@ -1,0 +1,94 @@
+---
+default_language_version:
+  python: python3.9
+fail_fast: true
+exclude: |
+    (?x)^(
+      ^Temp/.*$
+    )$
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.3.0
+    hooks:
+      - id: check-yaml
+        exclude: '^Helm/charts/app/templates/|^K8s-manifests/'
+        files: ^.*\.(yaml|yml)$
+      - id: detect-private-key
+      - id: check-added-large-files
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+        exclude: ^.*\.tftpl$
+      - id: check-json
+        files: ^.*\.json$
+        exclude: ^Terraform/modules/pre-envs-global/Lambdas/.*/response.json$
+      - id: check-merge-conflict
+      - id: detect-aws-credentials
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      # -   id: end-of-file-fixer
+
+  - repo: https://github.com/jumanjihouse/pre-commit-hooks
+    rev: 2.1.6  # or other specific tag
+    hooks:
+      - id: shellcheck
+        # exclude: |
+        #     (?x)^(
+        #     )$
+      # args:
+      #   -  --exclude=SC1091
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.26.3
+    hooks:
+      - id: yamllint
+        types: [file, yaml]
+        exclude: '^Helm/charts/app/templates/'
+        args:
+          - -c=./.yamllint.yaml
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 4.0.1
+    hooks:
+      - id: flake8
+        files: ^.*\.py$
+        args: [--config=./.flake8]
+
+  - repo: https://github.com/PyCQA/pylint
+    rev: v2.14.4
+    hooks:
+      - id: pylint
+        additional_dependencies:
+          - boto3==1.17.7
+          - botocore==1.20.7
+          - requests==2.25.1
+        files: ^.*\.py$
+        args: [-rn, -sn, --rcfile=./.pylintrc, --fail-on=I]
+
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.8.11
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.31.1
+    hooks:
+      - id: markdownlint
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: master
+    hooks:
+      - id: hadolint
+
+  - repo: https://github.com/IamTheFij/docker-pre-commit
+    rev: v2.0.0
+    hooks:
+      - id: docker-compose-check
+
+  - repo: https://github.com/Agilicus/pre-commit-hook-k8svalidate.git
+    rev: v0.0.8
+    hooks:
+      - id: k8svalidate
+        args: [--exclude, "Helm/**"]
+        types: [file, yaml]
+        #files: .yaml$
+        exclude: ^Helm

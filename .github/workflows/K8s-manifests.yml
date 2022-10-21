@@ -1,0 +1,84 @@
+---
+name: K8s-manifests
+on:
+  pull_request:
+    branches:
+      - '**'
+    types:
+      - opened
+      - edited
+      - reopened
+    paths:
+      - .github/workflows/K8s-manifests.yml
+      - K8s-manifests/**
+  push:
+    branches:
+      - "**"
+    paths:
+      - .github/workflows/K8s-manifests.yml
+      - K8s-manifests/**
+
+jobs:
+  yaml-lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.9.14     # Version range or exact version of a Python version to use, using SemVer's version range syntax
+          architecture: x64     # optional x64 or x86. Defaults to x64 if not specified
+          # cache: 'pip' # caching pip dependencies
+      - name: yaml-lint
+        id: yaml-lint
+        run: |
+          python -m pip install yamllint==1.28.0
+          yamllint -c ./.yamllint.yaml ./K8s-manifests/*.yaml
+
+  k8s-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.25.2'  # default is latest stable
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.4.0
+      - name: k8s-validate
+        id: k8s-validate
+        run: |
+          kubectl version --client
+          for h in $(find ./K8s-manifests -type f  | sort -n);do
+            kubectl apply --validate --dry-run=client -f $h
+          done
+
+      # - name: k8s-deploy
+      #   id: k8s-deploy
+      #   run: |
+      #     for h in $(find ./K8s-manifests -type f  | sort -n);do
+      #       kubectl apply --validate -f $h
+      #     done
+      #     sleep 70
+      #     kubectl get pod
+
+      - name: k8s-deploy
+        uses: Azure/k8s-deploy@v3.1
+        with:
+          namespace: 'default'
+          action: deploy
+          strategy: basic
+          manifests: |
+              K8s-manifests
+
+      - name: k8s-test
+        id: k8s-test
+        run: |
+
+          for el in $(seq 1 10);do
+            export result=`kubectl get job test -o json | jq .status.succeeded`
+
+            if [ "$result" == "1" ];then
+              echo 'Test is successful!';
+              exit
+            fi
+            sleep 5;
+          done

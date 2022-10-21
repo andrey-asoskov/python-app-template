@@ -1,0 +1,104 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-params
+  labels:
+    app: test
+data:
+  APP_HOST: "app"
+  APP_PORT: "3000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-script
+  labels:
+    app: test
+data:
+  test_app.sh: |
+    set -ex
+
+    #apt update
+    #apt install -y curl
+
+    ### Tests
+    #Root
+    curl -X GET  http://${APP_HOST}:${APP_PORT}/
+
+    #Health
+    curl -X GET  http://${APP_HOST}:${APP_PORT}/health
+
+    #Metrics
+    curl -X GET  http://${APP_HOST}:${APP_PORT}/metrics
+
+    #Crash
+    curl -X GET  http://${APP_HOST}:${APP_PORT}/crash
+
+
+    #Lookup  - 1 address
+    curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"apple.com"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup
+
+    #Lookup  - several addresses address
+    curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"cnn.com"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup
+
+    #Lookup  - bad address - 1
+    curl -X GET  -H "Content-Type: application/json"  -d '{"domain1":"apple.com"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup || true
+
+    #Lookup  - bad address - 2
+    curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"444.44"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup || true
+
+
+    #Validate
+    curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"1.2.3.4"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/validate
+
+    #Validate - bad
+    curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"1.2.3.444"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/validate || true
+
+    #Validate - bad - IPv6
+    curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"2001:db8::"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/validate || true
+
+
+    #History
+    curl -X GET  -H "Content-Type: application/json"  http://${APP_HOST}:${APP_PORT}/v1/history
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test
+  labels:
+    app: test
+spec:
+  completions: 1
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app: test
+    spec:
+      containers:
+        - name: test
+          image: alpine/curl
+          command:
+            - /bin/sh
+          args:
+            - /root/test_app.sh
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          envFrom:
+            - configMapRef:
+                name: test-params
+          volumeMounts:
+            - name: test-script
+              mountPath: /root
+      volumes:
+        - name: test-script
+          configMap:
+            name: test-script
+            defaultMode: 0444
+      restartPolicy: Never

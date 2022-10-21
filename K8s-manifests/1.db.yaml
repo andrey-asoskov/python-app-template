@@ -1,0 +1,118 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-creds
+  labels:
+    app: db
+stringData:
+  MYSQL_ROOT_PASSWORD: wEAzF#5VLE
+  MYSQL_USER: dbuser
+  MYSQL_PASSWORD: NY#xU8qfXM
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-params
+  labels:
+    app: db
+data:
+  MYSQL_DATABASE: db1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init
+  labels:
+    app: db
+data:
+  datadbschema.sql: |
+    USE db1;
+
+    DROP TABLE IF EXISTS  queries;
+
+    CREATE TABLE queries (
+        id MEDIUMINT NOT NULL AUTO_INCREMENT,
+        created_at int(10) NOT NULL,
+        client_ip char(15),
+        domain char(255),
+        addresses char(255),
+        PRIMARY KEY (id));
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  labels:
+    app: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: db
+          image: mariadb:10.5
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          ports:
+            - name: mariadb
+              containerPort: 3306
+              protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - 'mysql -v -b -u "root" -p"${MYSQL_ROOT_PASSWORD}" "${MYSQL_DATABASE}"  -e "DESCRIBE queries;"'
+          readinessProbe:
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - 'mysql -v -b -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" -e "DESCRIBE queries;"'
+          envFrom:
+            - configMapRef:
+                name: db-params
+            - secretRef:
+                name: db-creds
+          volumeMounts:
+            - name: db-init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: db-init
+          configMap:
+            name: db-init
+            defaultMode: 0444
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  labels:
+    app: db
+spec:
+  ports:
+    - name: mariadb
+      port: 3306
+      protocol: TCP
+      targetPort: 3306
+  selector:
+    app: db
+  type: ClusterIP

@@ -1,0 +1,5 @@
+flask==2.2.2
+gunicorn==20.1.0
+prometheus-flask-exporter==0.20.3
+mysql-connector==2.2.9
+dnspython==2.2.1
