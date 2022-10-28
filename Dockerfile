@@ -3,6 +3,9 @@ FROM python:3.9.14-alpine3.16
 LABEL version="0.1.0" \
   description="The App"
 
+HEALTHCHECK --interval=5s --timeout=3s --retries=3 --start-period=5s \
+  CMD curl -f http://localhost:3000/health || exit 1
+
 # hadolint ignore=DL3018
 RUN apk add --no-cache curl
 

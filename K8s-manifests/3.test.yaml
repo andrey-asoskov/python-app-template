@@ -76,9 +76,13 @@ spec:
       labels:
         app: test
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
         - name: test
-          image: alpine/curl
+          image: alpine/curl:3.14
           command:
             - /bin/sh
           args:
@@ -96,6 +100,9 @@ spec:
           volumeMounts:
             - name: test-script
               mountPath: /root
+              readOnly: true
+          securityContext:
+            readOnlyRootFilesystem: true
       volumes:
         - name: test-script
           configMap:

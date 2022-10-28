@@ -55,6 +55,7 @@ spec:
       labels:
         app: db
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: db
           image: mariadb:10.5

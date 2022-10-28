@@ -1,6 +1,6 @@
 # python-app-template
 
-Python Application Template to be tested via GHA and deployed via Docker-Compose, K8s Manifests and Helm
+Python Application Template to be tested via GHA and deployed via Docker-Compose, K8s Manifests and Helm.
 
 ## Prerequisites (Tested on)
 
@@ -144,11 +144,27 @@ hadolint --config ./.hadolint.yaml Dockerfile
 
 # Docker build
 docker build -t andreyasoskovwork/app:0.1.11 -f Dockerfile . 
-docker-compose up -d --wait --build
 
 # Docker push
 docker login -u andreyasoskovwork
 docker push andreyasoskovwork/app:0.1.11
+```
+
+### Start as Docker
+
+```commandline
+#Start as docker container
+docker run -d \
+-p 3000:3000 \
+-e DB_USER=dbuser \
+-e DB_PASSWORD='NY#xU8qfXM' \
+-e DB_NAME=db1 \
+-e DB_PORT=3306 \
+-e DB_HOST=172.17.0.2 \
+andreyasoskovwork/app:0.1.11
+
+# Start as Docker-compose
+docker-compose up -d --wait --build
 ```
 
 ### Deploy K8s manifests
@@ -162,6 +178,14 @@ minikube delete && minikube start --kubernetes-version=v1.25.0 \
 --extra-config=kubelet.authorization-mode=Webhook \
 --extra-config=scheduler.bind-address=0.0.0.0 \
 --extra-config=controller-manager.bind-address=0.0.0.0
+
+minikube delete 
+
+# Start Kind Cluster
+kind create cluster
+kubectl config set-context kind-kind
+
+kind delete cluster
 
 # Deploy manifests
 kubectl create namespace k8s-manifests
@@ -188,6 +212,12 @@ helm template --namespace helm-charts app \
 helm install --namespace helm-charts app \
 ./Helm/charts/app --values ./Helm/app_values.yaml \
 --dry-run
+```
+
+### Test via Checkov
+
+```commandline
+checkov -d . --config-file ./.checkov.yaml
 ```
 
 ### Package Helm Chart
