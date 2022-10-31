@@ -63,10 +63,10 @@ resources:
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
   # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
   limits:
-    cpu: 200m
+    cpu: 20m
     memory: 256Mi
   requests:
-    cpu: 100m
+    cpu: 10m
     memory: 128Mi
 
 autoscaling:
@@ -86,5 +86,5 @@ db_config:
   db_user: 'db_user'
   db_password: 'db_password'
   db_name: 'db_name'
-  db_service: db-mariadb
+  db_service: db-mariadb-primary
   db_port: 3306

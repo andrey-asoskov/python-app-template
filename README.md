@@ -190,7 +190,7 @@ kind delete cluster
 # Deploy manifests
 kubectl create namespace k8s-manifests
 kubectl -n k8s-manifests apply -f ./K8s-manifests/1.db.yaml
-kubectl -n k8s-manifests apply -f ./K8s-manifests/2.app.yaml
+kubectl -n k8s-manifests apply -f ./K8s-malnifests/2.app.yaml
 
 # Test
 kubectl -n k8s-manifests apply -f ./K8s-manifests/3.test.yaml
@@ -230,18 +230,18 @@ helm package ./Helm/charts/app -d ./Helm
 
 ```commandline
 # DB
-helm repo add stable https://charts.helm.sh/stable
+helm repo add bitnami https://charts.bitnami.com/bitnami
 
 helm template --namespace helm-charts db \
-stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 --validate
 
 helm install --namespace helm-charts db \
-stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 --dry-run 
 
 helm install --create-namespace --namespace helm-charts db \
-stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 --wait
 
 # App
@@ -261,6 +261,7 @@ kubectl -n helm-charts get pod
 
 ## Delete
 helm uninstall --namespace helm-charts app
+helm uninstall --namespace helm-charts db
 ```
 
 ### Test GHA workflows locally

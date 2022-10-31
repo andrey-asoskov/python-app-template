@@ -24,18 +24,14 @@ data:
     #apt install -y curl
 
     ### Tests
+    #Metrics
+    curl -X GET  http://${APP_HOST}:${APP_PORT}/metrics
+
     #Root
     curl -X GET  http://${APP_HOST}:${APP_PORT}/
 
     #Health
     curl -X GET  http://${APP_HOST}:${APP_PORT}/health
-
-    #Metrics
-    curl -X GET  http://${APP_HOST}:${APP_PORT}/metrics
-
-    #Crash
-    curl -X GET  http://${APP_HOST}:${APP_PORT}/crash
-
 
     #Lookup  - 1 address
     curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"apple.com"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup
@@ -49,7 +45,6 @@ data:
     #Lookup  - bad address - 2
     curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"444.44"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup || true
 
-
     #Validate
     curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"1.2.3.4"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/validate
 
@@ -62,3 +57,6 @@ data:
 
     #History
     curl -X GET  -H "Content-Type: application/json"  http://${APP_HOST}:${APP_PORT}/v1/history
+
+    #Crash
+    curl -X GET  http://${APP_HOST}:${APP_PORT}/crash

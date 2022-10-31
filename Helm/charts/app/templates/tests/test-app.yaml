@@ -9,10 +9,18 @@ metadata:
   annotations:
     "helm.sh/hook": test
     "helm.sh/hook-weight": "1"
+    checkov.io/skip1: CKV_K8S_9=Readiness Probe Should be Configured
+    checkov.io/skip2: CKV_K8S_8=Liveness Probe Should be Configured
 spec:
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: test
-    image: alpine/curl
+    image: alpine/curl:3.14
     command:
     - /bin/sh
     args:
@@ -32,6 +40,17 @@ spec:
     volumeMounts:
     - name: "{{ include "app.fullname" . }}-test-scripts"
       mountPath: /root
+    securityContext:
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 10001
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - NET_RAW
+          - ALL
   volumes:
   - name: "{{ include "app.fullname" . }}-test-scripts"
     configMap:

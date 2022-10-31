@@ -46,9 +46,9 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.9.14 # Version range or exact version of a Python version to use, using SemVer's version range syntax
-          architecture: x64 # optional x64 or x86. Defaults to x64 if not specified
-          # cache: 'pip' # caching pip dependencies
+          python-version: 3.9.14  # Version range or exact version of a Python version to use, using SemVer's version range syntax
+          architecture: x64  # optional x64 or x86. Defaults to x64 if not specified
+          # cache: 'pip'  # caching pip dependencies
 
       - name: Python Setup
         id: python-setup
@@ -94,9 +94,9 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.9.14 # Version range or exact version of a Python version to use, using SemVer's version range syntax
-          architecture: x64 # optional x64 or x86. Defaults to x64 if not specified
-          # cache: 'pip' # caching pip dependencies
+          python-version: 3.9.14  # Version range or exact version of a Python version to use, using SemVer's version range syntax
+          architecture: x64  # optional x64 or x86. Defaults to x64 if not specified
+          # cache: 'pip'  # caching pip dependencies
       - name: Python Setup
         id: python-setup
         run: |
@@ -171,7 +171,7 @@ jobs:
         with:
           image-ref: "andreyasoskovwork/app:${{ env.short_sha }}"
           format: "table"
-          exit-code: "1"
+          exit-code: "0"
           ignore-unfixed: true
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
@@ -223,7 +223,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: azure/setup-kubectl@v3
         with:
-          version: "v1.25.2" # default is latest stable
+          version: "v1.25.2"  # default is latest stable
       - name: Get short-sha
         id: short-sha
         run: |
@@ -275,7 +275,7 @@ jobs:
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_ENV
       - uses: azure/setup-kubectl@v3
         with:
-          version: "v1.25.2" # default is latest stable
+          version: "v1.25.2"  # default is latest stable
       - name: Create k8s Kind Cluster
         uses: helm/kind-action@v1.4.0
       - name: Set up Helm
@@ -287,7 +287,8 @@ jobs:
       - name: helm-validate
         run: |
 
-          ct lint --charts ./Helm/charts/app --validate-maintainers=false
+          ct lint --config ./Helm/ct-lint.yaml \
+          --charts ./Helm/charts/app
           helm lint ./Helm/charts/app
           helm template app \
           ./Helm/charts/app --values ./Helm/app_values.yaml \
@@ -299,28 +300,30 @@ jobs:
 
       - name: helm-deploy-db
         run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
 
-          helm repo add stable https://charts.helm.sh/stable
-
-          helm template db \
-          stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+          helm template --namespace helm-charts db \
+          bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
           --validate
 
-          helm install db \
-          stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+          helm install --namespace helm-charts db \
+          bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
           --dry-run
 
-          helm install db \
-          stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+          helm install --create-namespace --namespace helm-charts db \
+          bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
           --wait
+          # sleep 180
 
       - name: helm-deploy-app
         run: |
-
-          helm install app \
+          kubectl -n helm-charts get pods
+          helm install --create-namespace --namespace helm-charts app \
           ./Helm/charts/app --values ./Helm/app_values.yaml \
-          --set image.tag="${{ env.short_sha }}" \
           --wait
+          # sleep 180
+          helm list --namespace helm-charts
+          kubectl -n helm-charts get pods
 
       # - name: k8s-test
       #   id: k8s-test

@@ -23,14 +23,14 @@ data:
     #apt install -y curl
 
     ### Tests
+    #Metrics
+    curl -X GET  http://${APP_HOST}:${APP_PORT}/metrics
+
     #Root
     curl -X GET  http://${APP_HOST}:${APP_PORT}/
 
     #Health
     curl -X GET  http://${APP_HOST}:${APP_PORT}/health
-
-    #Metrics
-    curl -X GET  http://${APP_HOST}:${APP_PORT}/metrics
 
     #Crash
     curl -X GET  http://${APP_HOST}:${APP_PORT}/crash
@@ -79,7 +79,9 @@ spec:
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: test
           image: alpine/curl:3.14
@@ -103,6 +105,15 @@ spec:
               readOnly: true
           securityContext:
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - NET_RAW
+                - ALL
       volumes:
         - name: test-script
           configMap:

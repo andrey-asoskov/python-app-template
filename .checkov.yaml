@@ -31,6 +31,7 @@ framework:
 quiet: true
 # repo-id: bridgecrew/sample-repo
 skip-check:
+# AWS
   - CKV2_AWS_5   # Ensure Security Groups are attached to EC2 instances or ENIs
   - CKV2_AWS_11  # Ensure VPC flow logging is enabled in all VPCs
   - CKV_AWS_88   # EC2 instance should not have public IP
@@ -59,22 +60,23 @@ skip-check:
   - CKV_AWS_116  # Ensure AWS Lambda function is configured for a DLQ
   - CKV_AWS_111  # Ensure IAM policies does not allow write access without constraints
   - CKV_AWS_109  # Ensure IAM policies does not allow permissions management / resource exposure without constraints
-  - CKV_SECRET_6 # Base64 High Entropy String
-  - CKV_K8S_43   # Image should use digest
-  - CKV_K8S_23   #  Minimize the admission of root containers
-  - CKV_K8S_21   # The default namespace should not be used
-  - CKV_K8S_35   # Prefer using secrets as files over secrets as environment variables
-  - CKV_K8S_37   # Minimize the admission of containers with capabilities assigned
-  - CKV_K8S_31   # Ensure that the seccomp profile is set to docker/default or runtime/default
-  - CKV_K8S_20   # Containers should not run with allowPrivilegeEscalation
-  #- CKV_K8S_30   # Apply security context to your pods and containers
-  #- CKV_K8S_29   # Apply security context to your pods and containers
-  - CKV_K8S_28   # Minimize the admission of containers with the NET_RAW capability
-  - CKV_K8S_15   # Image Pull Policy should be Always
     # - CKV2_AWS_31 # Ensure WAF2 has a Logging Configuration
     # - CKV_AWS_192 # Ensure WAF prevents message lookup in Log4j2
     # - CKV_AWS_158 # Ensure that CloudWatch Log Group is not encrypted by KMS
     # - CKV_AWS_111 # Ensure IAM policies does not allow write access without constraint
+  - CKV_SECRET_6 # Base64 High Entropy String
+# Kubernetes
+  - CKV_K8S_43   # Image should use digest
+  #- CKV_K8S_23   # Minimize the admission of root containers
+  - CKV_K8S_21   # The default namespace should not be used
+  - CKV_K8S_35   # Prefer using secrets as files over secrets as environment variables
+  #- CKV_K8S_37   # Minimize the admission of containers with capabilities assigned
+  #- CKV_K8S_31   # Ensure that the seccomp profile is set to docker/default or runtime/default
+  #- CKV_K8S_20   # Containers should not run with allowPrivilegeEscalation
+  #- CKV_K8S_30   # Apply security context to your pods and containers
+  #- CKV_K8S_29   # Apply security context to your pods and containers
+  #- CKV_K8S_28   # Minimize the admission of containers with the NET_RAW capability
+  - CKV_K8S_15   # Image Pull Policy should be Always
 # skip-fixes: true
 # skip-framework:
 #   - dockerfile

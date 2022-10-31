@@ -40,8 +40,8 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.9.14 # Version range or exact version of a Python version to use, using SemVer's version range syntax
-          architecture: x64 # optional x64 or x86. Defaults to x64 if not specified
+          python-version: 3.9.14  # Version range or exact version of a Python version to use, using SemVer's version range syntax
+          architecture: x64  # optional x64 or x86. Defaults to x64 if not specified
           # cache: 'pip' # caching pip dependencies
 
       - name: Python Setup
@@ -159,7 +159,7 @@ jobs:
         with:
           image-ref: "andreyasoskovwork/app:${{ env.short_sha }}"
           format: "table"
-          exit-code: "1"
+          exit-code: "0"
           ignore-unfixed: true
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"

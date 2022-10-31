@@ -50,26 +50,30 @@ jobs:
 
       - name: helm-deploy-db
         run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
 
-          helm repo add stable https://charts.helm.sh/stable
-
-          helm template db \
-          stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+          helm template --namespace helm-charts db \
+          bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
           --validate
 
-          helm install db \
-          stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+          helm install --namespace helm-charts db \
+          bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
           --dry-run
 
-          helm install db \
-          stable/mariadb --version 7.3.14 --values ./Helm/mariadb_values.yaml \
+          helm install --create-namespace --namespace helm-charts db \
+          bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
           --wait
+          # sleep 180
 
       - name: helm-deploy-app
         run: |
-
-          helm install app \
-          ./Helm/charts/app --values ./Helm/app_values.yaml --wait
+          kubectl -n helm-charts get pods
+          helm install --create-namespace --namespace helm-charts app \
+          ./Helm/charts/app --values ./Helm/app_values.yaml \
+          --wait
+          # sleep 180
+          helm list --namespace helm-charts
+          kubectl -n helm-charts get pods
 
       # # Doesn't create a release
       # - name: helm-deploy-app

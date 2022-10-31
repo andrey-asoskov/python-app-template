@@ -9,7 +9,7 @@ HEALTHCHECK --interval=5s --timeout=3s --retries=3 --start-period=5s \
 # hadolint ignore=DL3018
 RUN apk add --no-cache curl
 
-RUN adduser -u 1000 -s /bin/bash -D appuser && mkdir -p /usr/src/app
+RUN adduser -u 10001 -s /bin/bash -D appuser && mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
 COPY ./app /usr/src/app
