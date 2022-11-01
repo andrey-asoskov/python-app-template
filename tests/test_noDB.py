@@ -3,8 +3,6 @@ import os
 os.environ["DB_HOST"] = ''
 os.environ["DB_PORT"] = ''
 os.environ["DB_NAME"] = ''
-os.environ["DB_USER"] = ''
-os.environ["DB_PASSWORD"] = ''
 
 import unittest
 import warnings

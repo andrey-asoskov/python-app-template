@@ -22,11 +22,36 @@ db_config = {
     'host': os.environ.get('DB_HOST') or '',
     'port': os.environ.get('DB_PORT') or '',
     'database': os.environ.get('DB_NAME') or '',
-    'user': os.environ.get('DB_USER') or '',
-    'password': os.environ.get('DB_PASSWORD') or '',
+    # 'user': os.environ.get('DB_USER') or '',
+    # 'password': os.environ.get('DB_PASSWORD') or '',
     'get_warnings': True,
     'raise_on_warnings': False
 }
+
+basepath = os.path.dirname(__file__)
+
+db_user = ''
+if os.path.isfile(basepath + '/../data/mysql-user-name'):
+  with open(basepath + '/../data/mysql-user-name', 'r', encoding="utf-8") as file_object:
+    db_user = file_object.read()
+elif os.path.isfile('/run/secrets/mysql-user-name'):
+  with open('/run/secrets/mysql-user-name', 'r', encoding="utf-8") as file_object:
+    db_user = file_object.read()
+else:
+  app.logger.error('Cannot read secrets - db user name')
+db_config['user'] = db_user
+
+db_password = ''
+if os.path.isfile(basepath + '/../data/mysql-user-password'):
+  with open(basepath + '/../data/mysql-user-password', 'r', encoding="utf-8") as file_object:
+    db_password = file_object.read()
+elif os.path.isfile('/run/secrets/mysql-user-password'):
+  with open('/run/secrets/mysql-user-password', 'r', encoding="utf-8") as file_object:
+    db_password = file_object.read()
+else:
+  app.logger.error('Cannot read secrets - db user password')
+
+db_config['password'] = db_password
 
 db_config_secure = dict(db_config)
 db_config_secure['password'] = 'XXX'

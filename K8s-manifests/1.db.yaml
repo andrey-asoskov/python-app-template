@@ -6,9 +6,9 @@ metadata:
   labels:
     app: db
 stringData:
-  MYSQL_ROOT_PASSWORD: wEAzF#5VLE
-  MYSQL_USER: dbuser
-  MYSQL_PASSWORD: NY#xU8qfXM
+  mysql-root-password: wEAzF#5VLE
+  mysql-user-name: dbuser
+  mysql-user-password: NY#xU8qfXM
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -17,6 +17,9 @@ metadata:
   labels:
     app: db
 data:
+  MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql-root-password
+  MYSQL_USER_FILE: /run/secrets/mysql-user-name
+  MYSQL_PASSWORD_FILE: /run/secrets/mysql-user-password
   MYSQL_DATABASE: db1
 ---
 apiVersion: v1
@@ -66,14 +69,14 @@ spec:
           type: RuntimeDefault
       containers:
         - name: db
-          image: mariadb:10.5
+          image: mariadb:10.9.3
           resources:
             limits:
               cpu: 200m
-              memory: 256Mi
+              memory: 512Mi
             requests:
               cpu: 100m
-              memory: 128Mi
+              memory: 256Mi
           ports:
             - name: mariadb
               containerPort: 3306
@@ -97,7 +100,7 @@ spec:
               command:
                 - /bin/bash
                 - -c
-                - 'mysql -v -b -u "root" -p"${MYSQL_ROOT_PASSWORD}" "${MYSQL_DATABASE}"  -e "DESCRIBE queries;"'
+                - 'mysql -v -b -u "root" -p"$(cat /run/secrets/mysql-root-password)" "${MYSQL_DATABASE}"  -e "DESCRIBE queries;"'
           readinessProbe:
             initialDelaySeconds: 15
             periodSeconds: 10
@@ -106,21 +109,23 @@ spec:
               command:
                 - /bin/bash
                 - -c
-                - 'mysql -v -b -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" -e "DESCRIBE queries;"'
+                - 'mysql -v -b -u "root" -p"$(cat /run/secrets/mysql-root-password)" "${MYSQL_DATABASE}" -e "DESCRIBE queries;"'
           envFrom:
             - configMapRef:
                 name: db-params
-            - secretRef:
-                name: db-creds
           volumeMounts:
             - name: db-init
               mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
             - name: db-data
               mountPath: /var/lib/mysql
             - name: db-run
               mountPath: /run/mysqld
             - name: tmp
               mountPath: /tmp
+            - name: db-creds
+              mountPath: "/run/secrets"
+              readOnly: true
       volumes:
         - name: db-init
           configMap:
@@ -132,6 +137,9 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        - name: db-creds
+          secret:
+            secretName: db-creds
 ---
 apiVersion: v1
 kind: Service

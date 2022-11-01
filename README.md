@@ -60,22 +60,23 @@ pylint --rcfile ./.pylintrc ./app/*.py
 ### Start the App
 
 ```commandline
-# Start MySQL
+# Start MariaDB
 docker run -d \
--v /Users/andrey-work/Documents/Work/NewJob/Stake.fish/data/datadbschema.sql:/docker-entrypoint-initdb.d/datadbschema.sql \
+-v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/datadbschema.sql:/docker-entrypoint-initdb.d/datadbschema.sql \
+-v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-root-password:/run/secrets/mysql-root-password \
+-v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-user-name:/run/secrets/mysql-user-name \
+-v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-user-password:/run/secrets/mysql-user-password \
 -p 3306:3306 \
--e MYSQL_ROOT_PASSWORD=wEAzF#5VLE \
+-e MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql-root-password \
 -e MYSQL_DATABASE=db1 \
--e MYSQL_USER=dbuser \
--e MYSQL_PASSWORD=NY#xU8qfXM \
+-e MYSQL_USER_FILE=/run/secrets/mysql-user-name \
+-e MYSQL_PASSWORD_FILE=/run/secrets/mysql-user-password \
 mariadb:10.9.3
 
 # Start the app
 export DB_HOST='127.0.0.1'
 export DB_PORT=3306
 export DB_NAME='db1'
-export DB_USER='dbuser'
-export DB_PASSWORD='NY#xU8qfXM'
 python ./app.py
 
 # Start via Flask CLI
@@ -132,8 +133,8 @@ curl -X GET  -H "Content-Type: application/json"  http://127.0.0.1:3000/v1/histo
 ### Test via Unittests
 
 ```commandline
-python -m unittest tests.test.py
-python -m unittest tests.test_noDB.py
+python -m unittest tests.test
+python -m unittest tests.test_noDB
 ```
 
 ### Create Docker image
@@ -141,27 +142,31 @@ python -m unittest tests.test_noDB.py
 ```commandline
 # Test
 hadolint --config ./.hadolint.yaml Dockerfile
+container-structure-test test --image andreyasoskovwork/app:0.1.12 --config ./container-structure-test/config.yaml
 
 # Docker build
-docker build -t andreyasoskovwork/app:0.1.11 -f Dockerfile . 
+docker build -t andreyasoskovwork/app:0.1.12 -f Dockerfile . 
 
 # Docker push
 docker login -u andreyasoskovwork
-docker push andreyasoskovwork/app:0.1.11
+docker push andreyasoskovwork/app:0.1.12
 ```
 
 ### Start as Docker
 
 ```commandline
-#Start as docker container
+# Start as docker container
 docker run -d \
+-v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-user-name:/run/secrets/mysql-user-name \
+-v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-user-password:/run/secrets/mysql-user-password \
 -p 3000:3000 \
--e DB_USER=dbuser \
--e DB_PASSWORD='NY#xU8qfXM' \
 -e DB_NAME=db1 \
 -e DB_PORT=3306 \
 -e DB_HOST=172.17.0.2 \
-andreyasoskovwork/app:0.1.11
+andreyasoskovwork/app:0.1.12
+
+# Test docker-compose
+docker-compose -f docker-compose.yaml config
 
 # Start as Docker-compose
 docker-compose up -d --wait --build
@@ -187,10 +192,15 @@ kubectl config set-context kind-kind
 
 kind delete cluster
 
+# Test manifests
+kubectl apply --validate --dry-run=client -f ./K8s-manifests/1.db.yaml
+kubectl apply --validate --dry-run=client -f ./K8s-manifests/2.app.yaml
+kubectl apply --validate --dry-run=client -f ./K8s-manifests/3.test.yaml
+
 # Deploy manifests
 kubectl create namespace k8s-manifests
 kubectl -n k8s-manifests apply -f ./K8s-manifests/1.db.yaml
-kubectl -n k8s-manifests apply -f ./K8s-malnifests/2.app.yaml
+kubectl -n k8s-manifests apply -f ./K8s-manifests/2.app.yaml
 
 # Test
 kubectl -n k8s-manifests apply -f ./K8s-manifests/3.test.yaml
@@ -205,6 +215,7 @@ ct lint --config ./Helm/ct-lint.yaml \
 --charts ./Helm/charts/app
 
 helm lint ./Helm/charts/app
+
 helm template --namespace helm-charts app \
 ./Helm/charts/app --values ./Helm/app_values.yaml \
 --validate  
@@ -241,6 +252,10 @@ bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 --dry-run 
 
 helm install --create-namespace --namespace helm-charts db \
+bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
+--wait
+
+helm upgrade --namespace helm-charts db \
 bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 --wait
 

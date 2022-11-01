@@ -77,9 +77,7 @@ spec:
             timeoutSeconds: 3
           envFrom:
           - configMapRef:
-              name: app-params
-          - secretRef:
-              name: app-creds     
+              name: app-params 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           lifecycle:
@@ -91,9 +89,15 @@ spec:
           volumeMounts:
             - name: app-tmp
               mountPath: /tmp
+            - name: app-creds
+              mountPath: "/run/secrets"
+              readOnly: true
       volumes:
         - name: app-tmp
           emptyDir: {}
+        - name: app-creds
+          secret:
+            secretName: app-creds
       terminationGracePeriodSeconds: 3
       {{- with .Values.nodeSelector }}
       nodeSelector:

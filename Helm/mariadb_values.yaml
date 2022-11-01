@@ -98,7 +98,7 @@ image:
   debug: false
 ## @param architecture MariaDB architecture (`standalone` or `replication`)
 ##
-architecture: replication
+architecture: standalone
 ## MariaDB Authentication parameters
 ##
 auth:
@@ -133,7 +133,7 @@ auth:
   forcePassword: false
   ## @param auth.usePasswordFiles Mount credentials as files instead of using environment variables
   ##
-  usePasswordFiles: false
+  usePasswordFiles: true
   ## @param auth.customPasswordFiles Use custom password files when `auth.usePasswordFiles` is set to `true`. Define path for keys `root` and `user`, also define `replicator` if `architecture` is set to `replication`
   ## Example:
   ## customPasswordFiles:
@@ -151,8 +151,6 @@ auth:
 ##      echo "Do something."
 ##
 initdbScripts:
-## @param initdbScriptsConfigMap ConfigMap with the initdb scripts (Note: Overrides `initdbScripts`)
-##
   datadbschema.sql: |
     USE db1;
 
@@ -165,6 +163,8 @@ initdbScripts:
         domain char(255),
         addresses char(255),
         PRIMARY KEY (id));
+## @param initdbScriptsConfigMap ConfigMap with the initdb scripts (Note: Overrides `initdbScripts`)
+##
 initdbScriptsConfigMap: ""
 
 ## @section MariaDB Primary parameters
@@ -379,7 +379,7 @@ primary:
   ## @param primary.livenessProbe.successThreshold Success threshold for livenessProbe
   ##
   livenessProbe:
-    enabled: true
+    enabled: false
     initialDelaySeconds: 120
     periodSeconds: 10
     timeoutSeconds: 1
@@ -393,7 +393,7 @@ primary:
   ## @param primary.readinessProbe.successThreshold Success threshold for readinessProbe
   ##
   readinessProbe:
-    enabled: true
+    enabled: false
     initialDelaySeconds: 30
     periodSeconds: 10
     timeoutSeconds: 1

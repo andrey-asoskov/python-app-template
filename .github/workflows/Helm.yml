@@ -63,7 +63,7 @@ jobs:
           helm install --create-namespace --namespace helm-charts db \
           bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
           --wait
-          # sleep 180
+          sleep 180
 
       - name: helm-deploy-app
         run: |

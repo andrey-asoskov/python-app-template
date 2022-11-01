@@ -9,7 +9,7 @@ image:
   repository: andreyasoskovwork/app
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.1.11"
+  tag: "0.1.12"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -86,5 +86,5 @@ db_config:
   db_user: 'db_user'
   db_password: 'db_password'
   db_name: 'db_name'
-  db_service: db-mariadb-primary
+  db_service: db-mariadb
   db_port: 3306

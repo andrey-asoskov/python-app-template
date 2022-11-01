@@ -3,8 +3,6 @@ import os
 os.environ["DB_HOST"] = '127.0.0.1'
 os.environ["DB_PORT"] = '3306'
 os.environ["DB_NAME"] = 'db1'
-os.environ["DB_USER"] = 'dbuser'
-os.environ["DB_PASSWORD"] = 'NY#xU8qfXM'
 
 import unittest
 import warnings

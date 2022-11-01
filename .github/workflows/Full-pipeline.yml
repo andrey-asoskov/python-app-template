@@ -320,8 +320,8 @@ jobs:
           kubectl -n helm-charts get pods
           helm install --create-namespace --namespace helm-charts app \
           ./Helm/charts/app --values ./Helm/app_values.yaml \
-          --wait
-          # sleep 180
+          #--wait
+          sleep 180
           helm list --namespace helm-charts
           kubectl -n helm-charts get pods
 

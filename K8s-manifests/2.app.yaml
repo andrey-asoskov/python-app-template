@@ -17,8 +17,8 @@ metadata:
   labels:
     app: app
 stringData:
-  DB_USER: dbuser
-  DB_PASSWORD: NY#xU8qfXM
+  mysql-user-name: dbuser
+  mysql-user-password: NY#xU8qfXM
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -44,7 +44,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: app
-          image: andreyasoskovwork/app:0.1.11
+          image: andreyasoskovwork/app:0.1.12
           imagePullPolicy: Always
           resources:
             limits:
@@ -93,8 +93,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: app-params
-            - secretRef:
-                name: app-creds
           lifecycle:
             preStop:
               httpGet:
@@ -104,9 +102,15 @@ spec:
           volumeMounts:
             - name: app-tmp
               mountPath: /tmp
+            - name: app-creds
+              mountPath: "/run/secrets"
+              readOnly: true
       volumes:
         - name: app-tmp
           emptyDir: {}
+        - name: app-creds
+          secret:
+            secretName: app-creds
       terminationGracePeriodSeconds: 3
 ---
 apiVersion: v1
