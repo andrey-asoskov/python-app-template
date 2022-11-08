@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ include "app.fullname" . }}-migrate-app-{{ randAlphaNum 4 | lower }}"
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-1"
+    "helm.sh/hook-delete-policy": keep
+    checkov.io/skip1: CKV_K8S_22=Use read-only filesystem for containers where possible
+spec:
+  template:
+    metadata:
+      name: "{{ .Release.Name }}"
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: db-migrations 
+          image:  "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+          args:
+            - -c
+            - # cd /usr/src/app && ls -al ./migrations && flask db migrate -m "migration1" && flask db upgrade
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - NET_RAW
+                - ALL
+          env:
+          - name: FLASK_APP
+            value: app.py
+          envFrom:
+          - configMapRef:
+              name: "{{ include "app.fullname" . }}-params"
+          volumeMounts:
+            - name: "{{ include "app.fullname" . }}-tmp"
+              mountPath: /tmp
+            - name: "{{ include "app.fullname" . }}-creds"
+              mountPath: /run/secrets
+              readOnly: true
+      volumes:
+        - name: "{{ include "app.fullname" . }}-tmp"
+          emptyDir: {}
+        - name: "{{ include "app.fullname" . }}-creds"
+          secret:
+            secretName: "{{ include "app.fullname" . }}-creds"
+  backoffLimit: 0 

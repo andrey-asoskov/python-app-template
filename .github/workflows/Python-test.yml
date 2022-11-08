@@ -11,6 +11,7 @@ on:
     paths:
       - .github/workflows/Python-test.yml
       - app/**
+      - cs-test/**
       - data/**
       - tests/**
       - .flake8
@@ -18,13 +19,13 @@ on:
       - .dockerignore
       - Dockerfile
       - .hadolint.yaml
-
   push:
     branches:
       - "**"
     paths:
       - .github/workflows/Python-test.yml
       - app/**
+      - cs-test/**
       - data/**
       - tests/**
       - .flake8
@@ -88,9 +89,9 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.9.14 # Version range or exact version of a Python version to use, using SemVer's version range syntax
-          architecture: x64 # optional x64 or x86. Defaults to x64 if not specified
-          # cache: 'pip' # caching pip dependencies
+          python-version: 3.9.14  # Version range or exact version of a Python version to use, using SemVer's version range syntax
+          architecture: x64  # optional x64 or x86. Defaults to x64 if not specified
+          # cache: 'pip'  # caching pip dependencies
       - name: Python Setup
         id: python-setup
         run: |
@@ -106,8 +107,7 @@ jobs:
           DB_USER: dbuser
           DB_PASSWORD: NY#xU8qfXM
         run: |
-          mysql -h ${DB_HOST} -P ${DB_PORT} --database=${DB_NAME} --user=${DB_USER} --password=${DB_PASSWORD} < ./data/datadbschema.sql
-          mysql -h ${DB_HOST} -P ${DB_PORT} --database=${DB_NAME} --user=${DB_USER} --password=${DB_PASSWORD} -e "DESCRIBE queries;"
+          mysql -h ${DB_HOST} -P ${DB_PORT} --database=${DB_NAME} --user=${DB_USER} --password=${DB_PASSWORD} -e "SHOW databases;"
 
       - name: Python test noDB
         id: python-test-nodb
@@ -123,7 +123,6 @@ jobs:
           DB_PASSWORD: NY#xU8qfXM
         run: |
           python -m unittest tests.test
-
   docker-build:
     runs-on: ubuntu-22.04
     needs: python-test
@@ -153,11 +152,15 @@ jobs:
         with:
           push: false
           load: true
-          tags: "andreyasoskovwork/app:${{ env.short_sha }}"
+          tags: "andreyasoskovwork/cat-app:${{ env.short_sha }}"
+      - name: Run container structure test
+        run: |
+          curl -LO https://storage.googleapis.com/container-structure-test/latest/container-structure-test-linux-amd64 && chmod +x container-structure-test-linux-amd64 && sudo mv container-structure-test-linux-amd64 /usr/local/bin/container-structure-test
+          container-structure-test test --image "andreyasoskovwork/cat-app:${{ env.short_sha }}" --config ./cs-test/config.yaml
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "andreyasoskovwork/app:${{ env.short_sha }}"
+          image-ref: "andreyasoskovwork/cat-app:${{ env.short_sha }}"
           format: "table"
           exit-code: "0"
           ignore-unfixed: true
@@ -168,12 +171,12 @@ jobs:
         with:
           push: true
           load: false
-          tags: "andreyasoskovwork/app:${{ env.short_sha }}"
+          tags: "andreyasoskovwork/cat-app:${{ env.short_sha }}"
       - name: Save docker image to tarball
         run: |
-          docker save andreyasoskovwork/app:"${{ env.short_sha }}" -o andreyasoskovwork-app_"${{ env.short_sha }}".tar
+          docker save andreyasoskovwork/cat-app:"${{ env.short_sha }}" -o andreyasoskovwork-cat-app_"${{ env.short_sha }}".tar
       - uses: actions/upload-artifact@v3
         with:
-          name: "andreyasoskovwork-app_${{ env.short_sha }}.tar"
-          path: "andreyasoskovwork-app_${{ env.short_sha }}.tar"
+          name: "andreyasoskovwork-cat-app_${{ env.short_sha }}.tar"
+          path: "andreyasoskovwork-cat-app_${{ env.short_sha }}.tar"
           retention-days: 5

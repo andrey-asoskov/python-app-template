@@ -16,7 +16,6 @@ on:
       - Dockerfile
       - .hadolint.yaml
       - docker-compose.yaml
-
   push:
     branches:
       - "**"
@@ -41,12 +40,10 @@ jobs:
           config: ./.hadolint.yaml
       - name: Docker-compose check
         run: |
-          set -x
           export PATH=$PATH:/usr/libexec/docker/cli-plugins/
           docker-compose -f docker-compose.yaml config
       - name: Run Docker-compose
         run: |
-          set -x
           export PATH=$PATH:/usr/libexec/docker/cli-plugins/
           docker-compose -f ./docker-compose.yaml up -d --build
           sleep 20

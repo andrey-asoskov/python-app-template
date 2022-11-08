@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: azure/setup-kubectl@v3
         with:
-          version: 'v1.25.2'  # default is latest stable
+          version: 'v1.25.2'
       - name: Create k8s Kind Cluster
         uses: helm/kind-action@v1.4.0
       - name: Set up Helm
@@ -36,7 +36,6 @@ jobs:
         uses: helm/chart-testing-action@v2.3.1
       - name: helm-validate
         run: |
-
           ct lint --config ./Helm/ct-lint.yaml \
           --charts ./Helm/charts/app
           helm lint ./Helm/charts/app
@@ -75,39 +74,6 @@ jobs:
           helm list --namespace helm-charts
           kubectl -n helm-charts get pods
 
-      # # Doesn't create a release
-      # - name: helm-deploy-app
-      #   uses: azure/k8s-bake@v2.2
-      #   with:
-      #     renderEngine: 'helm'
-      #     helmChart: './Helm/charts/app'
-      #     overrideFiles: './Helm/app_values.yaml'
-      #     helm-version: 'latest'
-      #     silent: 'false'
-
-      # - name: k8s-test
-      #   id: k8s-test
-      #   run: |
-      #     set -x
-
-      #     sleep 10
-
-      #     helm list
-      #     kubectl get pod
-      #     helm test app || true
-      #     kubectl describe pod app-test-app
-      #     kubectl logs app-test-app
-      #     kubectl get pod
-
-      #     kubectl get pod | grep test | grep Completed
-      #     if [ "$?" = "0" ]; then
-      #       echo "Test OK"
-      #       exit 0
-      #     else
-      #       echo "Test failed"
-      #       exit 1
-      #     fi
-
   helm-package:
     runs-on: ubuntu-22.04
     needs: helm-test
@@ -129,33 +95,3 @@ jobs:
           name: "helm-chart-${{ env.short_sha }}.tgz"
           path: docs/Package
           retention-days: 5
-
-
-  # release:
-  #   # depending on default permission settings for your org (contents being read-only or read-write for workloads), you will have to add permissions
-  #   # see: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#modifying-the-permissions-for-the-github_token
-  #   permissions:
-  #     contents: write
-  #   runs-on: ubuntu-22.04
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v2
-  #       with:
-  #         fetch-depth: 0
-
-  #     - name: Configure Git
-  #       run: |
-  #         git config user.name "$GITHUB_ACTOR"
-  #         git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-  #     - name: Install Helm
-  #       uses: azure/setup-helm@v3
-  #       with:
-  #         version: v3.10.0
-
-  #     - name: Run chart-releaser
-  #       uses: helm/chart-releaser-action@v1.4.1
-  #       env:
-  #         CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-  #       with:
-  #         charts_dir: Helm

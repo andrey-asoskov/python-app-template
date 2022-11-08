@@ -1,1 +1,25 @@
-*/*/__pycache__
+# IDE
+.idea/
+#**/*.ipr
+#**/*.iml
+#**/*.iws
+.vscode/
+
+# Python
+venv/
+**/__pycache__
+*.pyc
+.coverage
+
+#SQLLite
+*.sqlite3
+
+# MacOS
+.DS_Store
+
+# Zip
+*.zip
+*.tgz
+
+#Temp
+Temp/

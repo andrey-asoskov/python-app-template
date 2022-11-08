@@ -1,7 +1,7 @@
 import os
 
 os.environ["DB_HOST"] = ''
-os.environ["DB_PORT"] = ''
+os.environ["DB_PORT"] = '5555'
 os.environ["DB_NAME"] = ''
 
 import unittest
@@ -22,35 +22,40 @@ class AppTest_DB_notavailable(unittest.TestCase):
   def tearDown(self):
     self.ctx.pop()
 
-  def test_health(self):
+  def test_health1(self):
     response = self.client.get("/health")
 
     self.assertEqual(response.status_code, 400)
     self.assertTrue(isinstance(response.json['message'], str))
-    self.assertEqual(response.json['message'], 'Database is not connected')
+    self.assertEqual(response.json['message'], 'Something is wrong with DB connection')
+
+  def test_createt(self):
+    response = self.client.get("/create")
+
+    self.assertEqual(response.status_code, 400)
+    self.assertTrue(isinstance(response.json['message'], str))
+    self.assertEqual(response.json['message'], 'Something is wrong with DB connection')
+
+  def test_root(self):
+    response = self.client.get("/")
+
+    self.assertEqual(response.status_code, 400)
+    self.assertTrue(isinstance(response.json['message'], str))
+    self.assertEqual(response.json['message'], 'Something is wrong with DB connection')
+
+  def test_health2(self):
+    response = self.client.get("/health")
+
+    self.assertEqual(response.status_code, 400)
+    self.assertTrue(isinstance(response.json['message'], str))
+    self.assertEqual(response.json['message'], 'Something is wrong with DB connection')
 
   def test_crash(self):
     response = self.client.get("/crash")
 
-    self.assertEqual(response.status_code, 400)
+    self.assertEqual(response.status_code, 200)
     self.assertTrue(isinstance(response.json['message'], str))
-    self.assertEqual(response.json['message'], 'Database is not connected')
-
-  def test_lookup(self):
-    response = self.client.get(
-        "/v1/tools/lookup", headers={'Content-Type': 'application/json'}, data='{"domain": "apple.com"}')
-
-    self.assertEqual(response.status_code, 400)
-    self.assertTrue(isinstance(response.json['message'], str))
-    self.assertEqual(response.json['message'], 'Database is not connected')
-
-  def test_history(self):
-    response = self.client.get(
-        "/v1/history", headers={'Content-Type': 'application/json'})
-
-    self.assertEqual(response.status_code, 400)
-    self.assertTrue(isinstance(response.json['message'], str))
-    self.assertEqual(response.json['message'], 'Database is not connected')
+    self.assertEqual(response.json['message'], 'Successfull shutdown')
 
 
 if __name__ == "__main__":

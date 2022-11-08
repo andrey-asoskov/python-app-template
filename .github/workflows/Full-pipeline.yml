@@ -11,6 +11,7 @@ on:
     paths:
       - .github/workflows/Full-pipeline.yml
       - app/**
+      - cs-test/**
       - data/**
       - tests/**
       - Helm/**
@@ -21,13 +22,13 @@ on:
       - Dockerfile
       - .hadolint.yaml
       - docker-compose.yaml
-
   push:
     branches:
       - "**"
     paths:
       - .github/workflows/Full-pipeline.yml
       - app/**
+      - cs-test/**
       - data/**
       - tests/**
       - Helm/**
@@ -112,8 +113,7 @@ jobs:
           DB_USER: dbuser
           DB_PASSWORD: NY#xU8qfXM
         run: |
-          mysql -h ${DB_HOST} -P ${DB_PORT} --database=${DB_NAME} --user=${DB_USER} --password=${DB_PASSWORD} < ./data/datadbschema.sql
-          mysql -h ${DB_HOST} -P ${DB_PORT} --database=${DB_NAME} --user=${DB_USER} --password=${DB_PASSWORD} -e "DESCRIBE queries;"
+          mysql -h ${DB_HOST} -P ${DB_PORT} --database=${DB_NAME} --user=${DB_USER} --password=${DB_PASSWORD} -e "SHOW databases;"
 
       - name: Python test noDB
         id: python-test-nodb
@@ -165,11 +165,15 @@ jobs:
         with:
           push: false
           load: true
-          tags: "andreyasoskovwork/app:${{ env.short_sha }}"
+          tags: "andreyasoskovwork/cat-app:${{ env.short_sha }}"
+      - name: Run container structure test
+        run: |
+          curl -LO https://storage.googleapis.com/container-structure-test/latest/container-structure-test-linux-amd64 && chmod +x container-structure-test-linux-amd64 && sudo mv container-structure-test-linux-amd64 /usr/local/bin/container-structure-test
+          container-structure-test test --image "andreyasoskovwork/cat-app:${{ env.short_sha }}" --config ./cs-test/config.yaml
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "andreyasoskovwork/app:${{ env.short_sha }}"
+          image-ref: "andreyasoskovwork/cat-app:${{ env.short_sha }}"
           format: "table"
           exit-code: "0"
           ignore-unfixed: true
@@ -180,14 +184,14 @@ jobs:
         with:
           push: true
           load: false
-          tags: "andreyasoskovwork/app:${{ env.short_sha }}"
+          tags: "andreyasoskovwork/cat-app:${{ env.short_sha }}"
       - name: Save docker image to tarball
         run: |
-          docker save andreyasoskovwork/app:"${{ env.short_sha }}" -o andreyasoskovwork-app_"${{ env.short_sha }}".tar
+          docker save andreyasoskovwork/cat-app:"${{ env.short_sha }}" -o andreyasoskovwork-cat-app_"${{ env.short_sha }}".tar
       - uses: actions/upload-artifact@v3
         with:
-          name: "andreyasoskovwork-app_${{ env.short_sha }}.tar"
-          path: "andreyasoskovwork-app_${{ env.short_sha }}.tar"
+          name: "andreyasoskovwork-cat-app_${{ env.short_sha }}.tar"
+          path: "andreyasoskovwork-cat-app_${{ env.short_sha }}.tar"
           retention-days: 5
 
   docker-compose-test:
@@ -202,7 +206,7 @@ jobs:
         run: |
           set -x
           export PATH=$PATH:/usr/libexec/docker/cli-plugins/
-          sed -e "s/build: \./image: andreyasoskovwork\/app:${{ env.short_sha }}/g" ./docker-compose.yaml
+          sed -e "s/build: \./image: andreyasoskovwork\/cat-app:${{ env.short_sha }}/g" ./docker-compose.yaml
           docker-compose -f ./docker-compose.yaml up -d --build
           sleep 20
           docker-compose ps
@@ -223,7 +227,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: azure/setup-kubectl@v3
         with:
-          version: "v1.25.2"  # default is latest stable
+          version: "v1.25.2"
       - name: Get short-sha
         id: short-sha
         run: |
@@ -247,7 +251,7 @@ jobs:
           strategy: basic
           manifests: |
             K8s-manifests
-          images: "andreyasoskovwork/app:${{ env.short_sha }}"
+          images: "andreyasoskovwork/cat-app:${{ env.short_sha }}"
 
       - name: k8s-test
         id: k8s-test
@@ -275,7 +279,7 @@ jobs:
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_ENV
       - uses: azure/setup-kubectl@v3
         with:
-          version: "v1.25.2"  # default is latest stable
+          version: "v1.25.2"
       - name: Create k8s Kind Cluster
         uses: helm/kind-action@v1.4.0
       - name: Set up Helm
@@ -324,29 +328,6 @@ jobs:
           sleep 180
           helm list --namespace helm-charts
           kubectl -n helm-charts get pods
-
-      # - name: k8s-test
-      #   id: k8s-test
-      #   run: |
-      #     set -x
-
-      #     sleep 10
-
-      #     helm list
-      #     kubectl get pod
-      #     helm test app || true
-      #     kubectl describe pod app-test-app
-      #     kubectl logs app-test-app
-      #     kubectl get pod
-
-      #     kubectl get pod | grep test | grep Completed
-      #     if [ "$?" = "0" ]; then
-      #       echo "Test OK"
-      #       exit 0
-      #     else
-      #       echo "Test failed"
-      #       exit 1
-      #     fi
 
   helm-package:
     runs-on: ubuntu-22.04

@@ -1,16 +1,20 @@
 # python-app-template
 
-Python Application Template to be tested via GHA and deployed via Docker-Compose, K8s Manifests and Helm.
+Python Flask Application Template to be tested via GHA and deployed via Docker-Compose, K8s Manifests and Helm.
 
 ## Prerequisites (Tested on)
 
 - Python 3.9.14
 - Docker 20.10.17
 - Docker Compose v2.10.2
+- Haskell Dockerfile Linter 2.10.0
+- Container-structure-test 1.11.0
 - Kubernetes server: v1.25.0
 - kubectl v1.25.2
 - Helm v3.10.0
 - Helm Chart Testing 3.7.1
+- Checkov 2.1.270
+- Act 0.2.32
 
 ## CI/CD status
 
@@ -24,23 +28,27 @@ Python Application Template to be tested via GHA and deployed via Docker-Compose
 
 ## Contents
 
-| Path               | Description                                                              |
-|--------------------|--------------------------------------------------------------------------|
-| .github/workflows/ | CI pipelines to test the code, build Docker image and Helm chart package |
-| app/               | App code                                                                 |
-| data/              | DB schema config                                                         |
-| Helm/              | Helm charts config                                                       |
-| K8s-manifests/     | Kubernetes manifests (an alternative to Helm charst)                     |
-| tests/             | App unittests                                                            |
+| Path                    | Description                                                                      |
+|-------------------------|----------------------------------------------------------------------------------|
+| .github/workflows/      | CI pipelines to test app, build Docker image, test Docker-compose config, K8s manifests and test & package Helm chart |
+| app/                    | App for API with Prometheus client and migrations                                |
+| cs-test/                | Container Structure Test config to test Docker image                             |
+| data/                   | DB secrets                                                                       |
+| Helm/                   | Helm chart with test and migration hooks                                         |
+| K8s-kind/               | Kubernetes Kind cluster config                                                   |
+| K8s-manifests/          | Kubernetes manifests (an alternative to Helm charts)                             |
+| tests/                  | App unittests                                                                    |
+| .checkov.yaml
 | .dockerignore
-| .markdownlint.yaml
-| .pre-commit-config.yaml
 | .flake8
+| .hadolint.yaml          |  Hadlint config to test Dockerfile
+| .markdownlint.yaml
+| .pre-commit-config.yaml | Pre-commit hooks to test the code
 | .pylitrc
 | .python-version
 | .yamllint.yaml
-| docker-compose.yaml
-| Dockerfile
+| docker-compose.yaml     | Docker-compose file
+| Dockerfile              | Docker File
 
 ## Usage
 
@@ -57,20 +65,28 @@ pylint --rcfile ./.pylintrc ./tests/*.py
 pylint --rcfile ./.pylintrc ./app/*.py 
 ```
 
+### Test via Unittests
+
+```commandline
+python -m unittest tests.test
+python -m unittest tests.test_noDB
+```
+
 ### Start the App
 
 ```commandline
 # Start MariaDB
 docker run -d \
--v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/datadbschema.sql:/docker-entrypoint-initdb.d/datadbschema.sql \
--v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-root-password:/run/secrets/mysql-root-password \
--v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-user-name:/run/secrets/mysql-user-name \
--v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-user-password:/run/secrets/mysql-user-password \
+-v $(pwd)/data/mysql-root-password:/run/secrets/mysql-root-password \
+-v $(pwd)/data/mysql-user-name:/run/secrets/mysql-user-name \
+-v $(pwd)/data/mysql-user-password:/run/secrets/mysql-user-password \
+-v $(pwd)/data/mysql-conf-file:/run/secrets/mysql-conf-file \
 -p 3306:3306 \
 -e MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql-root-password \
 -e MYSQL_DATABASE=db1 \
 -e MYSQL_USER_FILE=/run/secrets/mysql-user-name \
 -e MYSQL_PASSWORD_FILE=/run/secrets/mysql-user-password \
+--health-cmd="mysql --defaults-extra-file=/run/secrets/mysql-conf-file -e 'SHOW databases;'" \
 mariadb:10.9.3
 
 # Start the app
@@ -86,13 +102,26 @@ flask run \
     --port 3000 \
     --reload
 
-#Via Gunicorn
+# Start via Gunicorn
 gunicorn --bind 0.0.0.0:3000 --access-logfile - --error-logfile - wsgi:app
+```
+
+### Run DB migrations
+
+```commandline
+# Create migration script after Schema Change
+flask db migrate -m "migration1"
+
+# Do the migration
+flask db upgrade
 ```
 
 ### Test manually
 
 ```commandline
+# Create
+curl -X GET  http://127.0.0.1:3000/create
+
 # Root
 curl -X GET  http://127.0.0.1:3000/
 
@@ -104,37 +133,12 @@ curl -X GET  http://127.0.0.1:3000/metrics
 
 # Crash
 curl -X GET  http://127.0.0.1:3000/crash
-
-# Lookup  - 1 address
-curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"apple.com"}'  http://127.0.0.1:3000/v1/tools/lookup 
-
-# Lookup  - several addresses
-curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"cnn.com"}'  http://127.0.0.1:3000/v1/tools/lookup 
-
-# Lookup  - bad - 1
-curl -X GET  -H "Content-Type: application/json"  -d '{"domain1":"apple.com"}'  http://127.0.0.1:3000/v1/tools/lookup 
-
-# Lookup  - bad - 2
-curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"444.44"}'  http://127.0.0.1:3000/v1/tools/lookup 
-
-# Validate
-curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"1.2.3.4"}'  http://127.0.0.1:3000/v1/tools/validate 
-
-# Validate - bad
-curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"1.2.3.444"}'  http://127.0.0.1:3000/v1/tools/validate 
-
-# Validate - bad - IPv6
-curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"2001:db8::"}'  http://127.0.0.1:3000/v1/tools/validate 
-
-# History
-curl -X GET  -H "Content-Type: application/json"  http://127.0.0.1:3000/v1/history
 ```
 
-### Test via Unittests
+### Test config (Dockerfile, k8s manifests, Helm, GHA) via Checkov
 
 ```commandline
-python -m unittest tests.test
-python -m unittest tests.test_noDB
+checkov -d . --config-file ./.checkov.yaml
 ```
 
 ### Create Docker image
@@ -142,14 +146,16 @@ python -m unittest tests.test_noDB
 ```commandline
 # Test
 hadolint --config ./.hadolint.yaml Dockerfile
-container-structure-test test --image andreyasoskovwork/app:0.1.12 --config ./container-structure-test/config.yaml
 
 # Docker build
-docker build -t andreyasoskovwork/app:0.1.12 -f Dockerfile . 
+docker build -t andreyasoskovwork/cat-app:0.1.15 -f Dockerfile . 
 
 # Docker push
 docker login -u andreyasoskovwork
-docker push andreyasoskovwork/app:0.1.12
+docker push andreyasoskovwork/cat-app:0.1.15
+
+# Test 
+container-structure-test test --image andreyasoskovwork/cat-app:0.1.14 --config ./cs-test/config.yaml
 ```
 
 ### Start as Docker
@@ -157,13 +163,13 @@ docker push andreyasoskovwork/app:0.1.12
 ```commandline
 # Start as docker container
 docker run -d \
--v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-user-name:/run/secrets/mysql-user-name \
--v /Users/andrey-work/Documents/Work/Repos/python-app-template/data/mysql-user-password:/run/secrets/mysql-user-password \
+-v $(pwd)/data/mysql-user-name:/run/secrets/mysql-user-name \
+-v $(pwd)/data/mysql-user-password:/run/secrets/mysql-user-password \
 -p 3000:3000 \
 -e DB_NAME=db1 \
 -e DB_PORT=3306 \
 -e DB_HOST=172.17.0.2 \
-andreyasoskovwork/app:0.1.12
+andreyasoskovwork/cat-app:0.1.14
 
 # Test docker-compose
 docker-compose -f docker-compose.yaml config
@@ -172,30 +178,30 @@ docker-compose -f docker-compose.yaml config
 docker-compose up -d --wait --build
 ```
 
-### Deploy K8s manifests
+### Start local Kubernetes cluster
 
 ```commandline
-# Start Minikube
-minikube delete && minikube start --kubernetes-version=v1.25.0 \
---memory=6g --bootstrapper=kubeadm \
---driver=virtualbox \
---extra-config=kubelet.authentication-token-webhook=true \
---extra-config=kubelet.authorization-mode=Webhook \
---extra-config=scheduler.bind-address=0.0.0.0 \
---extra-config=controller-manager.bind-address=0.0.0.0
-
-minikube delete 
-
 # Start Kind Cluster
-kind create cluster
-kubectl config set-context kind-kind
+kind create cluster --config ./K8s-kind/kind-config.yaml
 
+# Create Nginx Ingress Controller
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+# Delete Kind Cluster
 kind delete cluster
+```
 
+### Deplpoy via K8s manifests
+
+```commandline
 # Test manifests
 kubectl apply --validate --dry-run=client -f ./K8s-manifests/1.db.yaml
 kubectl apply --validate --dry-run=client -f ./K8s-manifests/2.app.yaml
 kubectl apply --validate --dry-run=client -f ./K8s-manifests/3.test.yaml
+
+kubectl apply  --dry-run=client -f ./K8s-manifests/1.db.yaml-o yaml
+kubectl apply  --dry-run=client -f ./K8s-manifests/2.app.yaml -o yaml
+kubectl apply  --dry-run=client -f ./K8s-manifests/3.test.yaml -o yaml
 
 # Deploy manifests
 kubectl create namespace k8s-manifests
@@ -205,6 +211,9 @@ kubectl -n k8s-manifests apply -f ./K8s-manifests/2.app.yaml
 # Test
 kubectl -n k8s-manifests apply -f ./K8s-manifests/3.test.yaml
 kubectl -n k8s-manifests get pod
+
+# Test Nginx Ingress
+curl --resolve www.example.com:80:127.0.0.1 -H 'Host: www.example.com' localhost/health
 ```
 
 ### Test Helm Chart
@@ -225,19 +234,7 @@ helm install --namespace helm-charts app \
 --dry-run
 ```
 
-### Test via Checkov
-
-```commandline
-checkov -d . --config-file ./.checkov.yaml
-```
-
-### Package Helm Chart
-
-```commandline
-helm package ./Helm/charts/app -d ./Helm
-```
-
-### Deploy Helm Chart
+### Deploy via Helm Chart
 
 ```commandline
 # DB
@@ -263,7 +260,7 @@ bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 helm install app --create-namespace --namespace helm-charts \
 ./Helm/charts/app --values ./Helm/app_values.yaml --wait
 
-## Update
+## Update with DB migration
 helm upgrade app --namespace helm-charts \
 ./Helm/charts/app --values ./Helm/app_values.yaml
 
@@ -274,17 +271,51 @@ helm list --namespace helm-charts
 helm test --namespace helm-charts app
 kubectl -n helm-charts get pod
 
+# Test Nginx Ingress
+curl --resolve www.example.com:80:127.0.0.1 -H 'Host: www.example.com' localhost/health
+
 ## Delete
 helm uninstall --namespace helm-charts app
 helm uninstall --namespace helm-charts db
+kubectl delete namespace helm-charts
+```
+
+### Package Helm Chart
+
+```commandline
+helm package ./Helm/charts/app -d ./Helm
+```
+
+### Get the data from App API
+
+```commandline
+## Via Docker or local 
+# Create data
+curl http://127.0.0.1:3000/create
+
+# Query the data
+curl http://127.0.0.1:3000 | jq .
+
+# Query prometheus Metrics
+curl http://127.0.0.1:3000/metrics
+
+## Via K8s Ingress
+# Create data
+curl --resolve www.example.com:80:127.0.0.1 -H 'Host: www.example.com' http://127.0.0.1/create
+
+# Query the data
+curl --resolve www.example.com:80:127.0.0.1 -H 'Host: www.example.com' http://127.0.0.1 | jq .
+
+# Query prometheus Metrics
+curl --resolve www.example.com:80:127.0.0.1 -H 'Host: www.example.com'  http://127.0.0.1/metrics
 ```
 
 ### Test GHA workflows locally
 
 ```commandline
 # Test using medium image
-act --rm -r -W ./.github/workflows/K8s-manifests.yml  -j k8s-test -P ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04
+act --rm -r -W ./.github/workflows/Python-test.yml -P ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04
 
 # Test using full image 20.04
-act --rm -r -W ./.github/workflows/DC-test.yml -P ubuntu-22.04=catthehacker/ubuntu:full-20.04
+act --rm -r -W ./.github/workflows/Python-test.yml -P ubuntu-22.04=catthehacker/ubuntu:full-20.04
 ```

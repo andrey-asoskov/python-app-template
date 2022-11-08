@@ -1,32 +1,19 @@
-import time
 import os
-import ipaddress
 import json
 import logging
-import sqlite3
-from flask import Flask, request, send_file
-from flask import abort, jsonify
+from flask import Flask, jsonify, request, abort
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from prometheus_flask_exporter import PrometheusMetrics
-import mysql.connector
-from mysql.connector import errorcode
-import dns.resolver
+
+
+basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
-prefix = 'v1'
 
 metrics = PrometheusMetrics(app)
 metrics.info("app_info", "The App", version="0.1.0")
-
-db_config = {
-    'host': os.environ.get('DB_HOST') or '',
-    'port': os.environ.get('DB_PORT') or '',
-    'database': os.environ.get('DB_NAME') or '',
-    # 'user': os.environ.get('DB_USER') or '',
-    # 'password': os.environ.get('DB_PASSWORD') or '',
-    'get_warnings': True,
-    'raise_on_warnings': False
-}
 
 basepath = os.path.dirname(__file__)
 
@@ -39,7 +26,6 @@ elif os.path.isfile('/run/secrets/mysql-user-name'):
     db_user = file_object.read()
 else:
   app.logger.error('Cannot read secrets - db user name')
-db_config['user'] = db_user
 
 db_password = ''
 if os.path.isfile(basepath + '/../data/mysql-user-password'):
@@ -51,45 +37,39 @@ elif os.path.isfile('/run/secrets/mysql-user-password'):
 else:
   app.logger.error('Cannot read secrets - db user password')
 
-db_config['password'] = db_password
+db_host = os.environ.get('DB_HOST') or ''
+db_port = os.environ.get('DB_PORT') or '3306'
+db_name = os.environ.get('DB_NAME') or ''
 
-db_config_secure = dict(db_config)
-db_config_secure['password'] = 'XXX'
-app.logger.info('DB Config: %s ', json.dumps(db_config_secure))
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'data.sqlite')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://' + db_user + ':' + db_password + '@' + db_host + ':' + db_port + '/' + db_name
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+app.logger.info('DB Config: ' + 'mysql+pymysql://' + db_user + ':' + 'XXX' + '@' + db_host + ':' + db_port + '/' + db_name)
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 
-if os.environ.get('APP_ENV', 'PROD') == "PROD":
-  try:
-    cnx_g = mysql.connector.connect(**db_config)
-    cursor_g = cnx_g.cursor(buffered=True)
-    show_status_g = ("SHOW STATUS;")
-    cursor_g.execute(show_status_g)
-  except mysql.connector.Error as err_g:
-    if err_g.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-      app.logger.error("Something is wrong with your user name or password")
-    elif err_g.errno == errorcode.ER_BAD_DB_ERROR:
-      app.logger.error("Database does not exist")
-    else:
-      app.logger.error(f'Something went wrong: {format(err_g)}')
-  else:
-    app.logger.info('Connected to MySQL Database')
-else:
-  cnx_g = sqlite3.connect("queries.sqlite3")
-  cur = cnx_g.cursor()
-  cur.execute("""
-              DROP TABLE IF EXISTS  queries;
-              """
-              )
-  cur.execute("""
-              CREATE TABLE queries
-              (id INTEGER PRIMARY KEY NOT NULL,
-              created_at int(10) NOT NULL,
-              client_ip char(15),
-              domain char(255),
-              addresses char(255));
-              """
-              )
-  app.logger.info('Connected to sqlite3 Database')
+# pylint: disable=too-few-public-methods
+class User(db.Model):
+  __tablename__ = 'users'
+  id = db.Column(db.Integer, primary_key=True)
+  username = db.Column(db.String(64), unique=True, index=True)
+  role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+
+  def __repr__(self):
+      return f'<User {self.username}>'
+
+
+# pylint: disable=too-few-public-methods
+class Role(db.Model):
+  __tablename__ = 'roles'
+  id = db.Column(db.Integer, primary_key=True)
+  name = db.Column(db.String(64), unique=True)
+  users = db.relationship('User', backref='role')
+
+  def __repr__(self):
+      return f'<Role {self.name}>'
 
 
 def return_ok(data):
@@ -161,183 +141,84 @@ def server_error(error):
   return response
 
 
-@app.route('/', methods=['GET'])
-def get_root():
-  if os.environ.get('KUBERNETES_SERVICE_PORT', False):
-    IS_K8s = True
+@app.route('/', methods=['GET', 'POST'])
+def index():
+  try:
+    users = User.query.all()
+  except:
+    app.logger.error("Something is wrong with DB connection")
+    message = 'Something is wrong with DB connection'
+    abort(400, {'message': message})
   else:
-    IS_K8s = False
+    res = {'results': []}
+    for user in users:
+        res['results'].append({
+          'user_id': user.id,
+          'username': user.username,
+          'user_role': Role.query.filter_by(id=user.role_id).first().name
+        })
 
-  data = {'version': '0.1.0',
-          'date': int(time.time()),
-          'kubernetes': IS_K8s
-          }
-
-  return return_ok(data)
+    return return_ok(res)
 
 
 @app.route('/health', methods=['GET'])
 def get_health():
-  if 'cnx_g' in globals():
-    try:
-      cursor = cnx_g.cursor(buffered=True)
-      show_status = ("SELECT * FROM queries;")
-      cursor.execute(show_status)
-    except mysql.connector.Error as err:
-      if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-        app.logger.error("Something is wrong with your user name or password")
-      elif err.errno == errorcode.ER_BAD_DB_ERROR:
-        app.logger.error("Database does not exist")
-      else:
-        app.logger.error(f'Something went wrong: {format(err)}')
-      message = 'Failed to get the data'
-      abort(400, {'message': message})
-    else:
-      message = 'health is ok'
-      data = {'message': message}
-      return return_ok(data)
-  else:
-    message = 'Database is not connected'
+  try:
+    db.session.execute('SELECT 1')
+  except:
+    app.logger.error("Something is wrong with DB connection")
+    message = 'Something is wrong with DB connection'
     abort(400, {'message': message})
+  else:
+    message = 'health is ok'
+    data = {'message': message}
+    return return_ok(data)
+
+
+@app.route('/create', methods=['GET'])
+def get_create():
+  try:
+    db.drop_all()
+    db.create_all()
+
+    admin_role = Role(name='Admin')
+    mod_role = Role(name='Moderator')
+    user_role = Role(name='User')
+
+    user_john = User(username='john', role=admin_role)
+    user_susan = User(username='susan', role=user_role)
+    user_david = User(username='david', role=user_role)
+
+    db.session.add(admin_role)
+    db.session.add(mod_role)
+    db.session.add(user_role)
+    db.session.add(user_john)
+    db.session.add(user_susan)
+    db.session.add(user_david)
+    db.session.commit()
+  except:
+    app.logger.error("Something is wrong with DB connection")
+    message = 'Something is wrong with DB connection'
+    abort(400, {'message': message})
+  else:
+    message = 'Data is created'
+    data = {'message': message}
+    return return_ok(data)
 
 
 @app.route("/crash", methods=['GET'])
 def get_crash():
-  if 'cnx_g' in globals():
-    try:
-      cursor = cnx_g.cursor()
-      grace_shutdown = ("UNLOCK TABLES;")
-      cursor.execute(grace_shutdown)
-    except mysql.connector.Error as err:
-      if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-        app.logger.error("Something is wrong with your user name or password")
-      elif err.errno == errorcode.ER_BAD_DB_ERROR:
-        app.logger.error("Database does not exist")
-      else:
-        app.logger.error(f'Something went wrong: {format(err)}')
-      message = 'Failed to shutdown'
-      abort(400, {'message': message})
-    else:
-      cnx_g.close()
-      message = 'Successfull shutdown'
-      data = {'message': message}
-      return return_ok(data)
-  else:
-    message = 'Database is not connected'
-    abort(400, {'message': message})
-
-
-@app.route('/' + prefix + '/tools/lookup', methods=['GET'])
-def get_lookup():
-  request_data = request.get_json(silent=True)
-
-  if 'domain' not in request_data:
-    abort(400, {'message': "Domain name is not provided!"})
-
   try:
-    resolved_domain = dns.resolver.resolve(request_data['domain'], 'A')
+    db.session.close()
   except:
-    abort(404, {'message': 'Failed to resolve: ' + request_data['domain']})
-
-  domain_addresses = [r.to_text() for r in resolved_domain]
-  resolved_at = int(time.time())
-
-  # Writing down successful query
-  if 'cnx_g' in globals():
-    try:
-      cursor = cnx_g.cursor(buffered=True)
-
-      add_entry = ("INSERT INTO queries (created_at, client_ip, domain, addresses) "
-                   "VALUES (%s, %s, %s, %s);")
-
-      entry_data = (resolved_at, request.remote_addr,
-                    request_data['domain'], ','.join(domain_addresses))
-
-      cursor.execute(add_entry, entry_data)
-      cnx_g.commit()
-    except mysql.connector.Error as err:
-      if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-        app.logger.error("Something is wrong with your user name or password")
-      elif err.errno == errorcode.ER_BAD_DB_ERROR:
-        app.logger.error("Database does not exist")
-      else:
-        app.logger.error(f'Something went wrong: {format(err)}')
-      message = 'Failed to insert the data'
-      abort(400, {'message': message})
-    else:
-      data = {'client_ip': request.remote_addr,
-              'addresses': [r.to_text() for r in resolved_domain],
-              'created_at': resolved_at,
-              'domain': request_data['domain']
-              }
-
-      return return_ok(data)
-  else:
-    message = 'Database is not connected'
+    app.logger.error('Failed to close DB connection')
+    message = 'Failed to close DB connection'
     abort(400, {'message': message})
-
-
-@app.route('/' + prefix + '/tools/validate', methods=['POST'])
-def post_validate():
-  request_data = request.get_json(silent=True)
-
-  if 'ip' not in request_data:
-    abort(400, {'message': "IP is not provided!"})
-
-  v6 = False
-
-  try:
-    ip = ipaddress.ip_address(request_data['ip'])
-    if ip.version == 6:
-      v6 = True
-  except:
-    abort(400, {'message': 'Not a valid IP address!'})
-
-  if v6 is True:
-    abort(400, {'message': 'Not a IPv4 address!'})
-
-  data = {'status': True}
-
-  return return_ok(data)
-
-
-@app.route('/' + prefix + '/history', methods=['GET'])
-def get_history():
-  if 'cnx_g' in globals():
-    try:
-      # cnx = mysql.connector.connect(**db_config)
-      cursor = cnx_g.cursor(buffered=True)
-      select_last20 = (
-          "SELECT created_at,client_ip, domain, addresses FROM queries ORDER BY ID DESC LIMIT 20")
-      cursor.execute(select_last20)
-    except mysql.connector.Error as err:
-      if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-        app.logger.error("Something is wrong with your user name or password")
-      elif err.errno == errorcode.ER_BAD_DB_ERROR:
-        app.logger.error("Database does not exist")
-      else:
-        app.logger.error(f'Something went wrong: {format(err)}')
-      message = 'Failed to get the data'
-      abort(400, {'message': message})
-    else:
-      entries = []
-
-      for (created_at, client_ip, domain, addresses) in cursor:
-        entries.append({'created_at': int(created_at),
-                        'client_ip': client_ip,
-                        'domain': domain,
-                        'addresses': [{'ip': i} for i in addresses.split(',')]
-                        })
-      return return_ok(entries)
   else:
-    message = 'Database is not connected'
-    abort(400, {'message': message})
-
-
-@app.route("/api/schema.json")
-def return_pdf():
-  return send_file('./swagger.json')
+    message = 'Successfull shutdown'
+    data = {'message': message}
+    return return_ok(data)
 
 
 if __name__ == '__main__':
-  app.run(host='0.0.0.0', port=4000)
+    app.run(host='0.0.0.0', port=4000)

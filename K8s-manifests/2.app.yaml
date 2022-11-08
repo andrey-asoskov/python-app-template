@@ -20,6 +20,13 @@ stringData:
   mysql-user-name: dbuser
   mysql-user-password: NY#xU8qfXM
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa1
+  labels:
+    app: app
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,6 +44,7 @@ spec:
         app: app
     spec:
       automountServiceAccountToken: false
+      serviceAccountName: sa1
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -44,7 +52,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: app
-          image: andreyasoskovwork/app:0.1.12
+          image: andreyasoskovwork/cat-app:0.1.15
           imagePullPolicy: Always
           resources:
             limits:
@@ -128,6 +136,23 @@ spec:
   selector:
     app: app
   type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+spec:
+  rules:
+    - host: www.example.com
+      http:
+        paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: app
+                port:
+                  number: 3000
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget

@@ -7,7 +7,7 @@ metadata:
     {{- include "app.labels" . | nindent 4 }}
 spec:
   ports:
-  - name: app
+  - name: {{ include "app.fullname" . }}
     port: {{ .Values.service.port }}  
     protocol: TCP
     targetPort: 3000

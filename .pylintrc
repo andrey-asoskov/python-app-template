@@ -1,6 +1,7 @@
 [MAIN]
 suggestion-mode=yes
 load-plugins=
+ignore-paths=^app/migrations/.*$
 
 [MESSAGES CONTROL]
 disable=
@@ -22,3 +23,4 @@ disable=
 		inconsistent-return-statements,
 		#too-many-statements
 		wrong-import-position,
+		duplicate-code

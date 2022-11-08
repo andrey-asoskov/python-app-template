@@ -51,15 +51,6 @@ jobs:
             kubectl apply --validate --dry-run=client -f $h
           done
 
-      # - name: k8s-deploy
-      #   id: k8s-deploy
-      #   run: |
-      #     for h in $(find ./K8s-manifests -type f  | sort -n);do
-      #       kubectl apply --validate -f $h
-      #     done
-      #     sleep 70
-      #     kubectl get pod
-
       - name: k8s-deploy
         uses: Azure/k8s-deploy@v3.1
         with:

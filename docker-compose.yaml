@@ -2,7 +2,7 @@
 version: "3.9"
 services:
   myapp:
-    # image: andreyasoskovwork/app:0.1.0
+    # image: andreyasoskovwork/cat-app:0.1.14
     build: .
     volumes:
       - ./data/mysql-user-name:/run/secrets/mysql-user-name
@@ -47,7 +47,6 @@ services:
   db:
     image: mariadb:10.9.3
     volumes:
-      - ./data/datadbschema.sql:/docker-entrypoint-initdb.d/datadbschema.sql
       - ./data/mysql-root-password:/run/secrets/mysql-root-password
       - ./data/mysql-user-name:/run/secrets/mysql-user-name
       - ./data/mysql-user-password:/run/secrets/mysql-user-password
@@ -75,13 +74,10 @@ services:
         window: 120s
     healthcheck:
       test:
-        - "CMD"
-        - "mysql"
-        - "--database=db1"
-        - "--user=dbuser"
-        - "--password=NY#xU8qfXM"
-        - "-e"
-        - "DESCRIBE queries;"
+        - "CMD-SHELL"
+        - /bin/bash
+        - -c
+        - mysql -v -b -u "root" -p"$$(cat /run/secrets/mysql-root-password)" -e "SHOW databases;"
       interval: 3s
       retries: 3
       start_period: 5s

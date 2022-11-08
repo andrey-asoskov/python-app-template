@@ -10,6 +10,6 @@ spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: app
-      app.kubernetes.io/instance: app
+      app.kubernetes.io/name: "{{ include "app.fullname" . }}"
+      app.kubernetes.io/instance: "{{ include "app.fullname" . }}"
     # {{- include "app.selectorLabels" . | nindent 4 }}

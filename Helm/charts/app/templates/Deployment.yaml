@@ -28,10 +28,7 @@ spec:
       automountServiceAccountToken: false
       serviceAccountName: {{ include "app.serviceAccountName" . }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001
-        seccompProfile:
-          type: RuntimeDefault
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -42,17 +39,6 @@ spec:
           - name: app
             containerPort: 3000
             protocol: TCP
-          securityContext:
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 10001
-            allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
-            capabilities:
-              drop:
-                - NET_RAW
-                - ALL
           startupProbe:
             httpGet:
               path: /health
@@ -77,7 +63,7 @@ spec:
             timeoutSeconds: 3
           envFrom:
           - configMapRef:
-              name: app-params 
+              name: "{{ include "app.fullname" . }}-params"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           lifecycle:
@@ -87,17 +73,17 @@ spec:
                 port: 3000
                 scheme: HTTP
           volumeMounts:
-            - name: app-tmp
+            - name: "{{ include "app.fullname" . }}-tmp"
               mountPath: /tmp
-            - name: app-creds
-              mountPath: "/run/secrets"
+            - name: "{{ include "app.fullname" . }}-creds"
+              mountPath: /run/secrets
               readOnly: true
       volumes:
-        - name: app-tmp
+        - name: "{{ include "app.fullname" . }}-tmp"
           emptyDir: {}
-        - name: app-creds
+        - name: "{{ include "app.fullname" . }}-creds"
           secret:
-            secretName: app-creds
+            secretName: "{{ include "app.fullname" . }}-creds"
       terminationGracePeriodSeconds: 3
       {{- with .Values.nodeSelector }}
       nodeSelector:

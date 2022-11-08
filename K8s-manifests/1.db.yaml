@@ -22,26 +22,6 @@ data:
   MYSQL_PASSWORD_FILE: /run/secrets/mysql-user-password
   MYSQL_DATABASE: db1
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: db-init
-  labels:
-    app: db
-data:
-  datadbschema.sql: |
-    USE db1;
-
-    DROP TABLE IF EXISTS  queries;
-
-    CREATE TABLE queries (
-        id MEDIUMINT NOT NULL AUTO_INCREMENT,
-        created_at int(10) NOT NULL,
-        client_ip char(15),
-        domain char(255),
-        addresses char(255),
-        PRIMARY KEY (id));
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -100,7 +80,7 @@ spec:
               command:
                 - /bin/bash
                 - -c
-                - 'mysql -v -b -u "root" -p"$(cat /run/secrets/mysql-root-password)" "${MYSQL_DATABASE}"  -e "DESCRIBE queries;"'
+                - 'mysql -v -b -u "root" -p"$(cat /run/secrets/mysql-root-password)" "${MYSQL_DATABASE}"  -e "SHOW databases;"'
           readinessProbe:
             initialDelaySeconds: 15
             periodSeconds: 10
@@ -109,14 +89,11 @@ spec:
               command:
                 - /bin/bash
                 - -c
-                - 'mysql -v -b -u "root" -p"$(cat /run/secrets/mysql-root-password)" "${MYSQL_DATABASE}" -e "DESCRIBE queries;"'
+                - 'mysql -v -b -u "root" -p"$(cat /run/secrets/mysql-root-password)" "${MYSQL_DATABASE}" -e "SHOW databases;"'
           envFrom:
             - configMapRef:
                 name: db-params
           volumeMounts:
-            - name: db-init
-              mountPath: /docker-entrypoint-initdb.d
-              readOnly: true
             - name: db-data
               mountPath: /var/lib/mysql
             - name: db-run
@@ -127,10 +104,6 @@ spec:
               mountPath: "/run/secrets"
               readOnly: true
       volumes:
-        - name: db-init
-          configMap:
-            name: db-init
-            defaultMode: 0444
         - name: db-data
           emptyDir: {}
         - name: db-run

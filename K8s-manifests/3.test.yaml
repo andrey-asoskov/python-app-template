@@ -19,48 +19,22 @@ data:
   test_app.sh: |
     set -ex
 
-    #apt update
-    #apt install -y curl
-
     ### Tests
-    #Metrics
-    curl -X GET  http://${APP_HOST}:${APP_PORT}/metrics
+    # Create
+    curl -X GET  http://${APP_HOST}:${APP_PORT}/create
 
-    #Root
+    # Root
     curl -X GET  http://${APP_HOST}:${APP_PORT}/
 
-    #Health
+    # Health
     curl -X GET  http://${APP_HOST}:${APP_PORT}/health
 
-    #Crash
+    # Metrics
+    curl -X GET  http://${APP_HOST}:${APP_PORT}/metrics
+
+    # Crash
     curl -X GET  http://${APP_HOST}:${APP_PORT}/crash
 
-
-    #Lookup  - 1 address
-    curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"apple.com"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup
-
-    #Lookup  - several addresses address
-    curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"cnn.com"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup
-
-    #Lookup  - bad address - 1
-    curl -X GET  -H "Content-Type: application/json"  -d '{"domain1":"apple.com"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup || true
-
-    #Lookup  - bad address - 2
-    curl -X GET  -H "Content-Type: application/json"  -d '{"domain":"444.44"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/lookup || true
-
-
-    #Validate
-    curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"1.2.3.4"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/validate
-
-    #Validate - bad
-    curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"1.2.3.444"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/validate || true
-
-    #Validate - bad - IPv6
-    curl -X POST  -H "Content-Type: application/json"  -d '{"ip":"2001:db8::"}'  http://${APP_HOST}:${APP_PORT}/v1/tools/validate || true
-
-
-    #History
-    curl -X GET  -H "Content-Type: application/json"  http://${APP_HOST}:${APP_PORT}/v1/history
 ---
 apiVersion: batch/v1
 kind: Job
