@@ -9,9 +9,9 @@ Python Flask Application Template to be tested via GHA and deployed via Docker-C
 - Docker Compose v2.10.2
 - Haskell Dockerfile Linter 2.10.0
 - Container-structure-test 1.11.0
-- Kubernetes server: v1.25.0
-- kubectl v1.25.2
-- Helm v3.10.0
+- Kubernetes server: v1.25.4
+- kubectl v1.26.0
+- Helm v3.10.2
 - Helm Chart Testing 3.7.1
 - Checkov 2.1.270
 - Act 0.2.32
@@ -77,17 +77,23 @@ python -m unittest tests.test_noDB
 ```commandline
 # Start MariaDB
 docker run -d \
+--name db \
+--user "999:999" \
 -v $(pwd)/data/mysql-root-password:/run/secrets/mysql-root-password \
 -v $(pwd)/data/mysql-user-name:/run/secrets/mysql-user-name \
 -v $(pwd)/data/mysql-user-password:/run/secrets/mysql-user-password \
 -v $(pwd)/data/mysql-conf-file:/run/secrets/mysql-conf-file \
+--read-only \
+-v /run/mysqld/ \
+-v /var/lib/mysql/ \
+-v /tmp/ \
 -p 3306:3306 \
 -e MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql-root-password \
 -e MYSQL_DATABASE=db1 \
 -e MYSQL_USER_FILE=/run/secrets/mysql-user-name \
 -e MYSQL_PASSWORD_FILE=/run/secrets/mysql-user-password \
 --health-cmd="mysql --defaults-extra-file=/run/secrets/mysql-conf-file -e 'SHOW databases;'" \
-mariadb:10.9.3
+mariadb:10.9.4
 
 # Start the app
 export DB_HOST='127.0.0.1'
@@ -163,12 +169,15 @@ container-structure-test test --image andreyasoskovwork/cat-app:0.1.14 --config 
 ```commandline
 # Start as docker container
 docker run -d \
+--user "10001:10001" \
 -v $(pwd)/data/mysql-user-name:/run/secrets/mysql-user-name \
 -v $(pwd)/data/mysql-user-password:/run/secrets/mysql-user-password \
+--read-only \
+-v /tmp/ \
 -p 3000:3000 \
 -e DB_NAME=db1 \
 -e DB_PORT=3306 \
--e DB_HOST=172.17.0.2 \
+-e DB_HOST=10.1.3.80 \
 andreyasoskovwork/cat-app:0.1.14
 
 # Test docker-compose
@@ -195,22 +204,24 @@ kind delete cluster
 
 ```commandline
 # Test manifests
+kubectl apply --validate --dry-run=client -f ./K8s-manifests/0.namespace.yaml 
 kubectl apply --validate --dry-run=client -f ./K8s-manifests/1.db.yaml
 kubectl apply --validate --dry-run=client -f ./K8s-manifests/2.app.yaml
 kubectl apply --validate --dry-run=client -f ./K8s-manifests/3.test.yaml
 
-kubectl apply  --dry-run=client -f ./K8s-manifests/1.db.yaml-o yaml
-kubectl apply  --dry-run=client -f ./K8s-manifests/2.app.yaml -o yaml
-kubectl apply  --dry-run=client -f ./K8s-manifests/3.test.yaml -o yaml
+kubectl apply --dry-run=client -f ./K8s-manifests/0.namespace.yaml -o yaml
+kubectl apply --dry-run=client -f ./K8s-manifests/1.db.yaml -o yaml
+kubectl apply --dry-run=client -f ./K8s-manifests/2.app.yaml -o yaml
+kubectl apply --dry-run=client -f ./K8s-manifests/3.test.yaml -o yaml
 
 # Deploy manifests
-kubectl create namespace k8s-manifests
-kubectl -n k8s-manifests apply -f ./K8s-manifests/1.db.yaml
-kubectl -n k8s-manifests apply -f ./K8s-manifests/2.app.yaml
+kubectl apply -f ./K8s-manifests/0.namespace.yaml
+kubectl -n app-manifests apply -f ./K8s-manifests/1.db.yaml
+kubectl -n app-manifests apply -f ./K8s-manifests/2.app.yaml
 
 # Test
-kubectl -n k8s-manifests apply -f ./K8s-manifests/3.test.yaml
-kubectl -n k8s-manifests get pod
+kubectl -n app-manifests apply -f ./K8s-manifests/3.test.yaml
+kubectl -n app-manifests get pod
 
 # Test Nginx Ingress
 curl --resolve www.example.com:80:127.0.0.1 -H 'Host: www.example.com' localhost/health
@@ -225,11 +236,11 @@ ct lint --config ./Helm/ct-lint.yaml \
 
 helm lint ./Helm/charts/app
 
-helm template --namespace helm-charts app \
+helm template --namespace app-helm app \
 ./Helm/charts/app --values ./Helm/app_values.yaml \
 --validate  
 
-helm install --namespace helm-charts app \
+helm install --namespace app-helm app \
 ./Helm/charts/app --values ./Helm/app_values.yaml \
 --dry-run
 ```
@@ -240,44 +251,48 @@ helm install --namespace helm-charts app \
 # DB
 helm repo add bitnami https://charts.bitnami.com/bitnami
 
-helm template --namespace helm-charts db \
+helm template --namespace app-helm db \
 bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 --validate
 
-helm install --namespace helm-charts db \
+helm install --namespace app-helm db \
 bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 --dry-run 
 
-helm install --create-namespace --namespace helm-charts db \
+kubectl apply -f ./Helm/namespace.yaml
+
+helm install --create-namespace --namespace app-helm db \
 bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 --wait
 
-helm upgrade --namespace helm-charts db \
+helm upgrade --namespace app-helm db \
 bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
 --wait
 
 # App
-helm install app --create-namespace --namespace helm-charts \
+kubectl apply -f ./Helm/namespace.yaml
+
+helm install app --create-namespace --namespace app-helm \
 ./Helm/charts/app --values ./Helm/app_values.yaml --wait
 
 ## Update with DB migration
-helm upgrade app --namespace helm-charts \
+helm upgrade app --namespace app-helm \
 ./Helm/charts/app --values ./Helm/app_values.yaml
 
 ## List
-helm list --namespace helm-charts
+helm list --namespace app-helm
 
 ## Test
-helm test --namespace helm-charts app
-kubectl -n helm-charts get pod
+helm test --namespace app-helm app
+kubectl -n app-helm get pod
 
 # Test Nginx Ingress
 curl --resolve www.example.com:80:127.0.0.1 -H 'Host: www.example.com' localhost/health
 
 ## Delete
-helm uninstall --namespace helm-charts app
-helm uninstall --namespace helm-charts db
-kubectl delete namespace helm-charts
+helm uninstall --namespace app-helm app
+helm uninstall --namespace app-helm db
+kubectl delete namespace app-helm
 ```
 
 ### Package Helm Chart

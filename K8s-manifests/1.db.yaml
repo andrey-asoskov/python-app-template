@@ -40,16 +40,19 @@ spec:
     metadata:
       labels:
         app: db
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/db: localhost/cri-containerd.apparmor.d
     spec:
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 999
+        runAsGroup: 999
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: db
-          image: mariadb:10.9.3
+          image: mariadb:10.9.4
           resources:
             limits:
               cpu: 200m
@@ -63,15 +66,10 @@ spec:
               protocol: TCP
           securityContext:
             readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 999
             allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
             capabilities:
               drop:
-                - NET_RAW
-                # - ALL
+                - ALL
           livenessProbe:
             initialDelaySeconds: 10
             periodSeconds: 10

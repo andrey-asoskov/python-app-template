@@ -15,33 +15,21 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: "sa1"
-
-podAnnotations: {}
+podAnnotations:
+  container.apparmor.security.beta.kubernetes.io/app: localhost/cri-containerd.apparmor.d
 
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 10001
+  runAsGroup: 10001
   seccompProfile:
     type: RuntimeDefault
 
 securityContext:
   readOnlyRootFilesystem: true
-  runAsNonRoot: true
-  runAsUser: 10001
   allowPrivilegeEscalation: false
-  seccompProfile:
-    type: RuntimeDefault
   capabilities:
     drop:
-      - NET_RAW
       - ALL
 
 service:
@@ -95,3 +83,6 @@ db_config:
   db_name: 'db_name'
   db_service: db-mariadb
   db_port: 3306
+
+serviceMonitor:
+  enabled: false

@@ -20,13 +20,6 @@ stringData:
   mysql-user-name: dbuser
   mysql-user-password: NY#xU8qfXM
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: sa1
-  labels:
-    app: app
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -42,12 +35,14 @@ spec:
     metadata:
       labels:
         app: app
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/app: localhost/cri-containerd.apparmor.d
     spec:
       automountServiceAccountToken: false
-      serviceAccountName: sa1
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
+        runAsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -67,14 +62,9 @@ spec:
               protocol: TCP
           securityContext:
             readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 10001
             allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
             capabilities:
               drop:
-                - NET_RAW
                 - ALL
           startupProbe:
             httpGet:

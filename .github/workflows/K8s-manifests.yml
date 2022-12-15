@@ -47,25 +47,27 @@ jobs:
         id: k8s-validate
         run: |
           kubectl version --client
-          for h in $(find ./K8s-manifests -type f  | sort -n);do
+          for h in $(find ./K8s-manifests -type f  | sort -n | grep -v '4.Service_Monitor.yaml' );do
             kubectl apply --validate --dry-run=client -f $h
           done
 
       - name: k8s-deploy
         uses: Azure/k8s-deploy@v3.1
         with:
-          namespace: 'default'
+          namespace: app-manifests
           action: deploy
           strategy: basic
           manifests: |
-              K8s-manifests
-
+            K8s-manifests/0.namespace.yaml
+            K8s-manifests/1.db.yaml
+            K8s-manifests/2.app.yaml
+            K8s-manifests/3.test.yaml
       - name: k8s-test
         id: k8s-test
         run: |
 
           for el in $(seq 1 10);do
-            export result=`kubectl get job test -o json | jq .status.succeeded`
+            export result=`kubectl -n app-manifests get job test -o json | jq .status.succeeded`
 
             if [ "$result" == "1" ];then
               echo 'Test is successful!';

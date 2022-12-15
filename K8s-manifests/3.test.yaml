@@ -49,6 +49,8 @@ spec:
     metadata:
       labels:
         app: test
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/test: localhost/cri-containerd.apparmor.d
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -79,14 +81,9 @@ spec:
               readOnly: true
           securityContext:
             readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 10001
             allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
             capabilities:
               drop:
-                - NET_RAW
                 - ALL
       volumes:
         - name: test-script

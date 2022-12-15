@@ -7,12 +7,13 @@ services:
     volumes:
       - ./data/mysql-user-name:/run/secrets/mysql-user-name
       - ./data/mysql-user-password:/run/secrets/mysql-user-password
+      - /tmp/
+    read_only: true
+    user: 10001:10001
     environment:
       DB_NAME: db1
       DB_HOST: db
       DB_PORT: 3306
-    links:
-      - "db:DB_HOST"
     ports:
       - 3000:3000
     networks:
@@ -50,6 +51,11 @@ services:
       - ./data/mysql-root-password:/run/secrets/mysql-root-password
       - ./data/mysql-user-name:/run/secrets/mysql-user-name
       - ./data/mysql-user-password:/run/secrets/mysql-user-password
+      - /run/mysqld/
+      - /var/lib/mysql/
+      - /tmp/
+    read_only: true
+    user: 999:999
     environment:
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql-root-password
       MYSQL_DATABASE: db1

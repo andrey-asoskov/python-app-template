@@ -35,7 +35,7 @@ fullnameOverride: ""
 clusterDomain: cluster.local
 ## @param commonAnnotations Common annotations to add to all MariaDB resources (sub-charts are not considered)
 ##
-commonAnnotations: {}
+commonAnnotations:
 ## @param commonLabels Common labels to add to all MariaDB resources (sub-charts are not considered)
 ##
 commonLabels: {}
@@ -240,7 +240,10 @@ primary:
   ## @param primary.podAnnotations Additional pod annotations for MariaDB primary pods
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
   ##
-  podAnnotations: {}
+  podAnnotations:
+    container.apparmor.security.beta.kubernetes.io/mariadb: localhost/cri-containerd.apparmor.d
+    container.apparmor.security.beta.kubernetes.io/metrics: localhost/cri-containerd.apparmor.d
+
   ## @param primary.podLabels Extra labels for MariaDB primary pods
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
   ##
@@ -314,6 +317,12 @@ primary:
   podSecurityContext:
     enabled: true
     fsGroup: 1001
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+
   ## MariaDB primary container security context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
   ## @param primary.containerSecurityContext.enabled MariaDB primary container securityContext
@@ -323,8 +332,12 @@ primary:
   containerSecurityContext:
     enabled: true
     # runAsUser: 1001
-    runAsUser: 10001
-    runAsNonRoot: true
+    # runAsUser: 10001
+    # runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
   ## MariaDB primary container's resource requests and limits
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
   ## We usually recommend not to specify default resources and to leave this as a conscious
@@ -478,10 +491,26 @@ primary:
     selector: {}
   ## @param primary.extraVolumes Optionally specify extra list of additional volumes to the MariaDB Primary pod(s)
   ##
-  extraVolumes: []
+  extraVolumes:
+    # - name: db-data
+    #   emptyDir: {}
+    # - name: db-conf
+    #   emptyDir: {}
+    - name: db-tmp
+      emptyDir: {}
+    - name: tmp
+      emptyDir: {}
   ## @param primary.extraVolumeMounts Optionally specify extra list of additional volumeMounts for the MariaDB Primary container(s)
   ##
-  extraVolumeMounts: []
+  extraVolumeMounts:
+    # - name: db-data
+    #   mountPath: /bitnami/mariadb/data
+    # - name: db-conf
+    #   mountPath: /opt/bitnami/mariadb/conf
+    - name: db-tmp
+      mountPath: /opt/bitnami/mariadb/tmp
+    - name: tmp
+      mountPath: /tmp
   ## @param primary.initContainers Add additional init containers for the MariaDB Primary pod(s)
   ##
   initContainers: []
@@ -1103,7 +1132,12 @@ metrics:
   ##     readOnlyRootFilesystem: true
   ##
   containerSecurityContext:
-    enabled: false
+    enabled: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
   ## Mysqld Prometheus exporter resource requests and limits
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
   ## We usually recommend not to specify default resources and to leave this as a conscious
@@ -1119,13 +1153,17 @@ metrics:
     ##    cpu: 100m
     ##    memory: 256Mi
     ##
-    limits: {}
+    limits:
+      cpu: 100m
+      memory: 256Mi
     ## Examples:
     ## requests:
     ##    cpu: 100m
     ##    memory: 256Mi
     ##
-    requests: {}
+    requests:
+      cpu: 100m
+      memory: 256Mi
   ## Configure extra options for liveness probe
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
   ## @param metrics.livenessProbe.enabled Enable livenessProbe
