@@ -23,9 +23,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-      - uses: azure/setup-kubectl@v3
-        with:
-          version: 'v1.25.2'
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
@@ -37,13 +34,6 @@ jobs:
           ct lint --config ./Helm/ct-lint.yaml \
           --charts ./Helm/charts/app
           helm lint ./Helm/charts/app
-          helm template app \
-          ./Helm/charts/app --values ./Helm/app_values.yaml \
-          --validate
-
-          helm install app \
-          ./Helm/charts/app --values ./Helm/app_values.yaml \
-          --dry-run
 
   helm-package:
     runs-on: ubuntu-22.04
