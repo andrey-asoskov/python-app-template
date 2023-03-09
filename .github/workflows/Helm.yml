@@ -59,6 +59,8 @@ jobs:
           bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
           --dry-run
 
+          kubectl apply -f ./Helm/namespace.yaml
+
           helm install --create-namespace --namespace app-helm db \
           bitnami/mariadb --version 11.3.3 --values ./Helm/mariadb_values.yaml \
           --wait
